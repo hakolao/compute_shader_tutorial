@@ -1,4 +1,7 @@
-use bevy::math::{const_mat4, Mat4};
+use bevy::{
+    math::{const_mat4, Mat4, Vec2},
+    prelude::Transform,
+};
 
 // c1r1: y flipped for vulkan
 #[rustfmt::skip]
@@ -9,9 +12,12 @@ pub const OPENGL_TO_VULKAN_MATRIX: Mat4 = const_mat4!([
     0.0, 0.0, 0.5, 1.0,
 ]);
 
+const Z_POS: f32 = -10.0;
+
 /// An orthographic camera that cannot move :)
 #[derive(Debug, Copy, Clone)]
 pub struct OrthographicCamera {
+    pub pos: Vec2,
     pub left: f32,
     pub right: f32,
     pub bottom: f32,
@@ -32,7 +38,7 @@ impl OrthographicCamera {
     }
 
     pub fn world_to_screen(&self) -> Mat4 {
-        OPENGL_TO_VULKAN_MATRIX
+        (OPENGL_TO_VULKAN_MATRIX
             * Mat4::orthographic_rh(
                 self.left * self.scale,
                 self.right * self.scale,
@@ -40,13 +46,15 @@ impl OrthographicCamera {
                 self.top * self.scale,
                 self.near,
                 self.far,
-            )
+            ))
+            * Transform::from_translation(self.pos.extend(Z_POS)).compute_matrix()
     }
 }
 
 impl Default for OrthographicCamera {
     fn default() -> Self {
         OrthographicCamera {
+            pos: Vec2::new(0.0, 0.0),
             left: -1.0,
             right: 1.0,
             bottom: -1.0,

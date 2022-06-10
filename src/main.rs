@@ -1,4 +1,7 @@
+mod ca_pipeline;
 mod camera;
+mod gui;
+mod matter;
 mod quad_pipeline;
 mod render;
 mod utils;
@@ -6,16 +9,53 @@ mod vertex;
 
 use std::sync::Arc;
 
-use bevy::{input::system::exit_on_esc_system, prelude::*, window::WindowMode};
+use bevy::{
+    core::FixedTimestep, input::system::exit_on_esc_system, prelude::*, window::WindowMode,
+};
 use bevy_vulkano::{
-    texture_from_file, VulkanoWindows, VulkanoWinitConfig, VulkanoWinitPlugin, DEFAULT_IMAGE_FORMAT,
+    texture_from_file, VulkanoContext, VulkanoWindows, VulkanoWinitConfig, VulkanoWinitPlugin,
+    DEFAULT_IMAGE_FORMAT,
 };
 use vulkano::image::ImageViewAbstract;
 
-use crate::{camera::OrthographicCamera, render::FillScreenRenderPass};
+use crate::{
+    ca_pipeline::CAPipeline,
+    camera::OrthographicCamera,
+    matter::MatterId,
+    render::FillScreenRenderPass,
+    utils::{cursor_to_world, get_canvas_line, MousePos},
+};
 
 pub const WIDTH: f32 = 1024.0;
 pub const HEIGHT: f32 = 1024.0;
+pub const KERNEL_SIZE_X: u32 = 16;
+pub const KERNEL_SIZE_Y: u32 = 16;
+pub const CANVAS_SIZE_X: u32 = WIDTH as u32;
+pub const CANVAS_SIZE_Y: u32 = HEIGHT as u32;
+pub const SIM_FPS: f64 = 60.0;
+pub const CLEAR_COLOR: [f32; 4] = [1.0; 4];
+
+pub struct DynamicSettings {
+    pub brush_radius: u32,
+    pub move_steps: u32,
+    pub draw_matter: MatterId,
+}
+
+impl Default for DynamicSettings {
+    fn default() -> Self {
+        Self {
+            brush_radius: 4,
+            move_steps: 1,
+            draw_matter: MatterId::Sand,
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct PreviousMousePos(pub Option<MousePos>);
+
+#[derive(Debug, Copy, Clone)]
+pub struct CurrentMousePos(pub Option<MousePos>);
 
 fn main() {
     App::new()
@@ -36,42 +76,71 @@ fn main() {
         .add_plugin(VulkanoWinitPlugin)
         .add_startup_system(setup)
         .add_system(exit_on_esc_system)
-        .add_system(render_system)
+        .add_system(update_camera)
+        .add_system(update_mouse.after(update_camera))
+        .add_system(draw_matter.after(update_mouse))
+        // Simulate only SIM_FPS times per second
+        .add_system_set_to_stage(
+            CoreStage::Update,
+            SystemSet::new()
+                .with_run_criteria(FixedTimestep::steps_per_second(SIM_FPS))
+                .with_system(simulate),
+        )
+        // Render after update
+        .add_system_to_stage(CoreStage::PostUpdate, render)
         .run();
 }
 
-pub struct TreeImage(pub Arc<dyn ImageViewAbstract + Send + Sync + 'static>);
-
 /// Creates our simulation & render pipelines
-fn setup(mut commands: Commands, vulkano_windows: Res<VulkanoWindows>) {
+fn setup(
+    mut commands: Commands,
+    vulkano_windows: Res<VulkanoWindows>,
+    vulkano_context: Res<VulkanoContext>,
+) {
     let primary_window_renderer = vulkano_windows.get_primary_window_renderer().unwrap();
-    let gfx_queue = primary_window_renderer.graphics_queue();
     // Create our render pass
     let fill_screen = FillScreenRenderPass::new(
-        gfx_queue.clone(),
+        vulkano_context.graphics_queue(),
         primary_window_renderer.swapchain_format(),
     );
-    // Create a tree image to test pipeline
-    let tree_image = texture_from_file(
-        gfx_queue,
-        include_bytes!("../assets/tree.png"),
-        DEFAULT_IMAGE_FORMAT,
-    )
-    .unwrap();
+
+    // Use same queue for compute
+    let sim_pipeline = CAPipeline::new(vulkano_context.compute_queue());
     // Create simple orthographic camera
     let camera = OrthographicCamera::default();
     // Insert resources
     commands.insert_resource(fill_screen);
-    commands.insert_resource(TreeImage(tree_image));
+    commands.insert_resource(sim_pipeline);
     commands.insert_resource(camera);
+    commands.insert_resource(DynamicSettings::default());
+    commands.insert_resource(PreviousMousePos(None));
+    commands.insert_resource(CurrentMousePos(None));
 }
 
-fn render_system(
-    windows: Res<Windows>,
+fn draw_matter(
+    mut sim_pipeline: ResMut<CAPipeline>,
+    prev: Res<PreviousMousePos>,
+    current: Res<CurrentMousePos>,
+    settings: Res<DynamicSettings>,
+    mouse_button_input: Res<Input<MouseButton>>,
+) {
+    if let Some(current) = current.0 {
+        if mouse_button_input.pressed(MouseButton::Left) {
+            let line = get_canvas_line(prev.0, current);
+            sim_pipeline.draw_matter(&line, settings.brush_radius as f32, settings.draw_matter);
+        }
+    }
+}
+
+fn simulate(mut sim_pipeline: ResMut<CAPipeline>, settings: Res<DynamicSettings>) {
+    sim_pipeline.step(settings.move_steps);
+}
+
+fn render(
     mut vulkano_windows: ResMut<VulkanoWindows>,
     mut fill_screen: ResMut<FillScreenRenderPass>,
-    tree_image: Res<TreeImage>,
-    mut camera: ResMut<OrthographicCamera>,
+    mut sim_pipeline: ResMut<CAPipeline>,
+    camera: Res<OrthographicCamera>,
 ) {
     let primary_window_renderer = vulkano_windows.get_primary_window_renderer_mut().unwrap();
     // Start frame
@@ -83,15 +152,33 @@ fn render_system(
         Ok(f) => f,
     };
 
-    let color_image = tree_image.0.clone();
-    let final_image = primary_window_renderer.final_image();
-    // Update camera
-    let window = windows.get_primary().unwrap();
-    camera.update(window.width(), window.height());
+    let canvas_image = sim_pipeline.color_image();
+
     // Render
+    let final_image = primary_window_renderer.final_image();
     let after_render =
-        fill_screen.render_image_to_screen(before, *camera, color_image, final_image);
+        fill_screen.render_image_to_screen(before, *camera, canvas_image, final_image, CLEAR_COLOR);
 
     // Finish Frame
     primary_window_renderer.finish_frame(after_render);
+}
+
+fn update_camera(windows: Res<Windows>, mut camera: ResMut<OrthographicCamera>) {
+    let window = windows.get_primary().unwrap();
+    camera.update(window.width(), window.height());
+}
+
+fn update_mouse(
+    windows: Res<Windows>,
+    mut _prev: ResMut<PreviousMousePos>,
+    mut _current: ResMut<CurrentMousePos>,
+    camera: Res<OrthographicCamera>,
+) {
+    _prev.0 = _current.0;
+    let primary = windows.get_primary().unwrap();
+    if primary.cursor_position().is_some() {
+        _current.0 = Some(MousePos {
+            world: cursor_to_world(primary, camera.pos, camera.scale),
+        });
+    }
 }

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use bevy_vulkano::FinalImageView;
+use bevy_vulkano::{DeviceImageView, FinalImageView};
 use vulkano::{
     command_buffer::{AutoCommandBufferBuilder, CommandBufferUsage, SubpassContents},
     device::Queue,
@@ -52,8 +52,9 @@ impl FillScreenRenderPass {
         &mut self,
         before_future: F,
         camera: OrthographicCamera,
-        image: Arc<dyn ImageViewAbstract>,
+        image: DeviceImageView,
         target: FinalImageView,
+        clear_color: [f32; 4],
     ) -> Box<dyn GpuFuture>
     where
         F: GpuFuture + 'static,
@@ -67,7 +68,6 @@ impl FillScreenRenderPass {
         })
         .unwrap();
         // Create primary command buffer builder & begin render pass with black clear color
-        let clear_color = [0.0; 4];
         let mut command_buffer_builder = AutoCommandBufferBuilder::primary(
             self.gfx_queue.device().clone(),
             self.gfx_queue.family(),
