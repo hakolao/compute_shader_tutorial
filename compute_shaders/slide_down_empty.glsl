@@ -37,7 +37,7 @@ void slide_right_empty(ivec2 pos) {
 }
 
 void slide_down_empty(ivec2 pos) {
-    if ((push_constants.sim_step + push_constants.move_step) % 2 == 0) {
+    if ((push_constants.move_step) % 2 == 0) {
         slide_left_empty(pos);
     } else {
         slide_right_empty(pos);

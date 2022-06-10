@@ -43,6 +43,7 @@ pub struct DynamicSettings {
     pub brush_radius: u32,
     pub move_steps: u32,
     pub draw_matter: MatterId,
+    pub is_paused: bool,
 }
 
 impl Default for DynamicSettings {
@@ -51,6 +52,7 @@ impl Default for DynamicSettings {
             brush_radius: 4,
             move_steps: 1,
             draw_matter: MatterId::Sand,
+            is_paused: false,
         }
     }
 }
@@ -80,8 +82,7 @@ fn main() {
         .add_plugin(VulkanoWinitPlugin)
         .add_startup_system(setup)
         .add_system(exit_on_esc_system)
-        .add_system(zoom_camera)
-        .add_system(move_camera)
+        .add_system(input_actions)
         .add_system(update_camera)
         .add_system(update_mouse)
         .add_system(draw_matter)
@@ -139,7 +140,7 @@ fn draw_matter(
 }
 
 fn simulate(mut sim_pipeline: ResMut<CAPipeline>, settings: Res<DynamicSettings>) {
-    sim_pipeline.step(settings.move_steps);
+    sim_pipeline.step(settings.move_steps, settings.is_paused);
 }
 
 fn render(
@@ -162,8 +163,15 @@ fn render(
 
     // Render
     let final_image = primary_window_renderer.final_image();
-    let after_render =
-        fill_screen.render_image_to_screen(before, *camera, canvas_image, final_image, CLEAR_COLOR);
+    let after_render = fill_screen.draw(
+        before,
+        *camera,
+        canvas_image,
+        final_image,
+        CLEAR_COLOR,
+        false,
+        true,
+    );
 
     // Finish Frame
     primary_window_renderer.finish_frame(after_render);
@@ -189,24 +197,14 @@ fn update_mouse(
     }
 }
 
-fn zoom_camera(
-    mut camera: ResMut<OrthographicCamera>,
-    mut mouse_input_events: EventReader<MouseWheel>,
-) {
-    for e in mouse_input_events.iter() {
-        if e.y < 0.0 {
-            camera.scale *= 1.05;
-        } else {
-            camera.scale *= 1.0 / 1.05;
-        }
-    }
-}
-
-fn move_camera(
+fn input_actions(
     time: Res<Time>,
     mut camera: ResMut<OrthographicCamera>,
     keyboard_input: Res<Input<KeyCode>>,
+    mut mouse_input_events: EventReader<MouseWheel>,
+    mut settings: ResMut<DynamicSettings>,
 ) {
+    // Move camera with arrows & WASD
     let up = keyboard_input.pressed(KeyCode::W) || keyboard_input.pressed(KeyCode::Up);
     let down = keyboard_input.pressed(KeyCode::S) || keyboard_input.pressed(KeyCode::Down);
     let left = keyboard_input.pressed(KeyCode::A) || keyboard_input.pressed(KeyCode::Left);
@@ -219,5 +217,19 @@ fn move_camera(
     if move_delta != Vec2::ZERO {
         move_delta /= move_delta.length();
         camera.pos += move_delta * time.delta_seconds() * CAMERA_MOVE_SPEED;
+    }
+
+    // Zoom camera with mouse scroll
+    for e in mouse_input_events.iter() {
+        if e.y < 0.0 {
+            camera.scale *= 1.05;
+        } else {
+            camera.scale *= 1.0 / 1.05;
+        }
+    }
+
+    // Pause
+    if keyboard_input.just_pressed(KeyCode::Space) {
+        settings.is_paused = !settings.is_paused;
     }
 }

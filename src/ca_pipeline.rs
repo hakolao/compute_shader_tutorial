@@ -160,7 +160,7 @@ impl CAPipeline {
         }
     }
 
-    pub fn step(&mut self, _move_steps: u32) {
+    pub fn step(&mut self, move_steps: u32, is_paused: bool) {
         let mut command_buffer_builder = AutoCommandBufferBuilder::primary(
             self.compute_queue.device().clone(),
             self.compute_queue.family(),
@@ -168,17 +168,35 @@ impl CAPipeline {
         )
         .unwrap();
 
-        // for i in move steps ...
+        if !is_paused {
+            // Move our sand / powder
+            for _ in 0..move_steps {
+                self.dispatch(
+                    &mut command_buffer_builder,
+                    self.fall_pipeline.clone(),
+                    true,
+                );
+                self.dispatch(
+                    &mut command_buffer_builder,
+                    self.slide_pipeline.clone(),
+                    true,
+                );
+                self.move_step += 1;
+            }
+        }
 
-        self.dispatch(&mut command_buffer_builder, self.color_pipeline.clone());
+        // Finally color the image
+        self.dispatch(
+            &mut command_buffer_builder,
+            self.color_pipeline.clone(),
+            false,
+        );
 
         // Finish
         let command_buffer = command_buffer_builder.build().unwrap();
         let finished = command_buffer.execute(self.compute_queue.clone()).unwrap();
         let _fut = finished.then_signal_fence_and_flush().unwrap();
 
-        // Swap input and output so the output becomes the input for next frame
-        // std::mem::swap(&mut self.matter_in, &mut self.matter_out);
         self.sim_step += 1;
     }
 
@@ -186,6 +204,7 @@ impl CAPipeline {
         &mut self,
         builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
         pipeline: Arc<ComputePipeline>,
+        swap: bool,
     ) {
         let pipeline_layout = pipeline.layout();
         let desc_layout = pipeline_layout.set_layouts().get(0).unwrap();
@@ -210,6 +229,11 @@ impl CAPipeline {
                 1,
             ])
             .unwrap();
+
+        // Double buffering: Swap input and output so the output becomes the input for next frame
+        if swap {
+            std::mem::swap(&mut self.matter_in, &mut self.matter_out);
+        }
     }
 }
 
