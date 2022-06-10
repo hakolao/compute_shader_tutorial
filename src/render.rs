@@ -5,7 +5,7 @@ use vulkano::{
     command_buffer::{AutoCommandBufferBuilder, CommandBufferUsage, SubpassContents},
     device::Queue,
     format::Format,
-    image::{ImageAccess, ImageViewAbstract},
+    image::ImageAccess,
     render_pass::{Framebuffer, FramebufferCreateInfo, RenderPass, Subpass},
     sync::GpuFuture,
 };

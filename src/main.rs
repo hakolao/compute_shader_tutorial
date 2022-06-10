@@ -7,19 +7,13 @@ mod render;
 mod utils;
 mod vertex;
 
-use std::sync::Arc;
-
 use bevy::{
     core::FixedTimestep,
     input::{mouse::MouseWheel, system::exit_on_esc_system},
     prelude::*,
     window::WindowMode,
 };
-use bevy_vulkano::{
-    texture_from_file, VulkanoContext, VulkanoWindows, VulkanoWinitConfig, VulkanoWinitPlugin,
-    DEFAULT_IMAGE_FORMAT,
-};
-use vulkano::image::ImageViewAbstract;
+use bevy_vulkano::{VulkanoContext, VulkanoWindows, VulkanoWinitConfig, VulkanoWinitPlugin};
 
 use crate::{
     ca_pipeline::CAPipeline,
@@ -37,7 +31,7 @@ pub const CANVAS_SIZE_X: u32 = WIDTH as u32;
 pub const CANVAS_SIZE_Y: u32 = HEIGHT as u32;
 pub const SIM_FPS: f64 = 60.0;
 pub const CLEAR_COLOR: [f32; 4] = [1.0; 4];
-pub const CAMERA_MOVE_SPEED: f32 = 100.0;
+pub const CAMERA_MOVE_SPEED: f32 = 200.0;
 
 pub struct DynamicSettings {
     pub brush_radius: u32,
@@ -146,7 +140,7 @@ fn simulate(mut sim_pipeline: ResMut<CAPipeline>, settings: Res<DynamicSettings>
 fn render(
     mut vulkano_windows: ResMut<VulkanoWindows>,
     mut fill_screen: ResMut<FillScreenRenderPass>,
-    mut sim_pipeline: ResMut<CAPipeline>,
+    sim_pipeline: Res<CAPipeline>,
     camera: Res<OrthographicCamera>,
 ) {
     let primary_window_renderer = vulkano_windows.get_primary_window_renderer_mut().unwrap();

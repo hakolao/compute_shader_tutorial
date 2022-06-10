@@ -1,26 +1,17 @@
-use std::{collections::BTreeMap, iter::FromIterator, sync::Arc};
+use std::sync::Arc;
 
 use bevy::math::{IVec2, Vec2};
 use bevy_vulkano::{create_device_image, DeviceImageView};
-use rand::Rng;
 use vulkano::{
     buffer::{BufferUsage, CpuAccessibleBuffer},
     command_buffer::{
         AutoCommandBufferBuilder, CommandBufferUsage, PrimaryAutoCommandBuffer,
         PrimaryCommandBuffer,
     },
-    descriptor_set::{
-        layout::{DescriptorSetLayout, DescriptorSetLayoutBinding, DescriptorSetLayoutCreateInfo},
-        PersistentDescriptorSet, WriteDescriptorSet,
-    },
+    descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet},
     device::Queue,
     format::Format,
-    image::ImageAccess,
-    pipeline::{
-        layout::PipelineLayoutCreateInfo, ComputePipeline, Pipeline, PipelineBindPoint,
-        PipelineLayout,
-    },
-    shader::{EntryPoint, SpecializationConstants},
+    pipeline::{ComputePipeline, Pipeline, PipelineBindPoint},
     sync::GpuFuture,
 };
 
