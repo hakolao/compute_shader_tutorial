@@ -52,7 +52,15 @@ pub fn user_interface(
             );
             sized_text(
                 ui,
-                format!("Sim Time: {:.2} ms", sim_timer.0.time_average_ms()),
+                format!(
+                    "Sim Time: {:.2} ms, {}",
+                    sim_timer.0.time_average_ms(),
+                    if settings.is_paused {
+                        "Paused"
+                    } else {
+                        "Playing"
+                    }
+                ),
                 size,
             );
             sized_text(
