@@ -115,7 +115,7 @@ pub fn u32_rgba_to_u8_rgba(num: u32) -> [u8; 4] {
 pub fn cursor_to_world(window: &Window, camera_pos: Vec2, camera_scale: f32) -> Vec2 {
     (window.cursor_position().unwrap() - Vec2::new(window.width() / 2.0, window.height() / 2.0))
         * camera_scale
-        + camera_pos
+        - camera_pos
 }
 
 #[derive(Debug, Copy, Clone)]

@@ -10,7 +10,10 @@ mod vertex;
 use std::sync::Arc;
 
 use bevy::{
-    core::FixedTimestep, input::system::exit_on_esc_system, prelude::*, window::WindowMode,
+    core::FixedTimestep,
+    input::{mouse::MouseWheel, system::exit_on_esc_system},
+    prelude::*,
+    window::WindowMode,
 };
 use bevy_vulkano::{
     texture_from_file, VulkanoContext, VulkanoWindows, VulkanoWinitConfig, VulkanoWinitPlugin,
@@ -34,6 +37,7 @@ pub const CANVAS_SIZE_X: u32 = WIDTH as u32;
 pub const CANVAS_SIZE_Y: u32 = HEIGHT as u32;
 pub const SIM_FPS: f64 = 60.0;
 pub const CLEAR_COLOR: [f32; 4] = [1.0; 4];
+pub const CAMERA_MOVE_SPEED: f32 = 100.0;
 
 pub struct DynamicSettings {
     pub brush_radius: u32,
@@ -76,9 +80,11 @@ fn main() {
         .add_plugin(VulkanoWinitPlugin)
         .add_startup_system(setup)
         .add_system(exit_on_esc_system)
+        .add_system(zoom_camera)
+        .add_system(move_camera)
         .add_system(update_camera)
-        .add_system(update_mouse.after(update_camera))
-        .add_system(draw_matter.after(update_mouse))
+        .add_system(update_mouse)
+        .add_system(draw_matter)
         // Simulate only SIM_FPS times per second
         .add_system_set_to_stage(
             CoreStage::Update,
@@ -180,5 +186,38 @@ fn update_mouse(
         _current.0 = Some(MousePos {
             world: cursor_to_world(primary, camera.pos, camera.scale),
         });
+    }
+}
+
+fn zoom_camera(
+    mut camera: ResMut<OrthographicCamera>,
+    mut mouse_input_events: EventReader<MouseWheel>,
+) {
+    for e in mouse_input_events.iter() {
+        if e.y < 0.0 {
+            camera.scale *= 1.05;
+        } else {
+            camera.scale *= 1.0 / 1.05;
+        }
+    }
+}
+
+fn move_camera(
+    time: Res<Time>,
+    mut camera: ResMut<OrthographicCamera>,
+    keyboard_input: Res<Input<KeyCode>>,
+) {
+    let up = keyboard_input.pressed(KeyCode::W) || keyboard_input.pressed(KeyCode::Up);
+    let down = keyboard_input.pressed(KeyCode::S) || keyboard_input.pressed(KeyCode::Down);
+    let left = keyboard_input.pressed(KeyCode::A) || keyboard_input.pressed(KeyCode::Left);
+    let right = keyboard_input.pressed(KeyCode::D) || keyboard_input.pressed(KeyCode::Right);
+
+    let x_axis = -(right as i8) + left as i8;
+    let y_axis = -(up as i8) + down as i8;
+
+    let mut move_delta = Vec2::new(x_axis as f32, y_axis as f32);
+    if move_delta != Vec2::ZERO {
+        move_delta /= move_delta.length();
+        camera.pos += move_delta * time.delta_seconds() * CAMERA_MOVE_SPEED;
     }
 }
