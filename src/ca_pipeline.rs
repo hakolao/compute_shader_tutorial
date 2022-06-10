@@ -122,6 +122,20 @@ impl CAPipeline {
         pos.x >= 0 && pos.x < CANVAS_SIZE_X as i32 && pos.y >= 0 && pos.y < CANVAS_SIZE_Y as i32
     }
 
+    fn index(&self, pos: IVec2) -> usize {
+        (pos.y * CANVAS_SIZE_Y as i32 + pos.x) as usize
+    }
+
+    pub fn query_matter(&self, pos: IVec2) -> Option<MatterId> {
+        if self.is_inside(pos) {
+            let matter_in = self.matter_in.read().unwrap();
+            let index = self.index(pos);
+            Some(MatterWithColor::from(matter_in[index]).matter_id())
+        } else {
+            None
+        }
+    }
+
     pub fn draw_matter(&mut self, line: &[IVec2], radius: f32, matter: MatterId) {
         let mut matter_in = self.matter_in.write().unwrap();
         for &pos in line.iter() {
@@ -142,7 +156,7 @@ impl CAPipeline {
                     {
                         if self.is_inside([x, y].into()) {
                             // Draw
-                            matter_in[(y * CANVAS_SIZE_Y as i32 + x) as usize] =
+                            matter_in[self.index([x, y].into())] =
                                 MatterWithColor::new(matter).value;
                         }
                     }
@@ -162,20 +176,10 @@ impl CAPipeline {
         if !is_paused {
             // Move our sand / powder
             for _ in 0..move_steps {
-                self.dispatch(
-                    &mut command_buffer_builder,
-                    self.fall_pipeline.clone(),
-                    true,
-                );
-                self.move_step += 1;
+                self.step_movement(&mut command_buffer_builder, self.fall_pipeline.clone());
             }
             for _ in 0..move_steps {
-                self.dispatch(
-                    &mut command_buffer_builder,
-                    self.slide_pipeline.clone(),
-                    true,
-                );
-                self.move_step += 1;
+                self.step_movement(&mut command_buffer_builder, self.slide_pipeline.clone());
             }
         }
 
@@ -192,6 +196,15 @@ impl CAPipeline {
         let _fut = finished.then_signal_fence_and_flush().unwrap();
 
         self.sim_step += 1;
+    }
+
+    fn step_movement(
+        &mut self,
+        builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
+        pipeline: Arc<ComputePipeline>,
+    ) {
+        self.dispatch(builder, pipeline.clone(), true);
+        self.move_step += 1;
     }
 
     fn dispatch(

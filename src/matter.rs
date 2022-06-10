@@ -1,12 +1,14 @@
 use rand::Rng;
+use strum_macros::EnumIter;
 
 use crate::utils::u32_rgba_to_u8_rgba;
 
 #[repr(u8)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(EnumIter, Debug, Copy, Clone, Eq, PartialEq)]
 pub enum MatterId {
     Empty = 0,
     Sand = 1,
+    Wood = 2,
 }
 
 impl Default for MatterId {
@@ -26,6 +28,7 @@ impl MatterId {
         let color = match *self {
             MatterId::Empty => 0x0,
             MatterId::Sand => 0xc2b280ff,
+            MatterId::Wood => 0xba8c63ff,
         };
         u32_rgba_to_u8_rgba(color)
     }

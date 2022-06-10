@@ -12,6 +12,8 @@ vulkano = "0.29.0"
 vulkano-shaders = "0.29.0"
 rand = "0.8.5"
 line_drawing = "1.0.0"
+strum_macros = "0.24.0"
+strum = "0.24.0"
 
 [dependencies.bevy]
 version = "0.7.0"

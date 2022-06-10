@@ -97,12 +97,17 @@ bool is_empty(Matter matter) {
     return matter.matter == 0;
 }
 
+// A shortcut for Sand. Wood does not have gravity for now...
+bool is_gravity(Matter m) {
+    return m.matter == 1;
+}
+
 bool falls_on_empty(Matter from, Matter to) {
-    return !is_empty(from) && is_empty(to);
+    return is_gravity(from) && is_empty(to);
 }
 
 bool slides_on_empty(Matter from_diagonal, Matter to_diagonal, Matter from_down) {
-    return !is_empty(from_diagonal) && !is_empty(from_down) && is_empty(to_diagonal);
+    return is_gravity(from_diagonal) && !is_empty(from_down) && is_empty(to_diagonal);
 }
 
 

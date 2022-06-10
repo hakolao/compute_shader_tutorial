@@ -4,6 +4,7 @@ mod gui;
 mod matter;
 mod quad_pipeline;
 mod render;
+mod timer;
 mod utils;
 mod vertex;
 
@@ -21,17 +22,18 @@ use crate::{
     gui::user_interface,
     matter::MatterId,
     render::FillScreenRenderPass,
+    timer::{PerformanceTimer, RenderTimer, SimTimer},
     utils::{cursor_to_world, get_canvas_line, MousePos},
 };
 
-pub const WIDTH: f32 = 1024.0;
-pub const HEIGHT: f32 = 1024.0;
-pub const KERNEL_SIZE_X: u32 = 16;
-pub const KERNEL_SIZE_Y: u32 = 16;
+pub const WIDTH: f32 = 1536.0;
+pub const HEIGHT: f32 = 1536.0;
+pub const KERNEL_SIZE_X: u32 = 32;
+pub const KERNEL_SIZE_Y: u32 = 32;
 pub const CANVAS_SIZE_X: u32 = WIDTH as u32;
 pub const CANVAS_SIZE_Y: u32 = HEIGHT as u32;
 pub const SIM_FPS: f64 = 60.0;
-pub const CLEAR_COLOR: [f32; 4] = [1.0; 4];
+pub const CLEAR_COLOR: [f32; 4] = [0.2; 4];
 pub const CAMERA_MOVE_SPEED: f32 = 200.0;
 
 pub struct DynamicSettings {
@@ -113,6 +115,9 @@ fn setup(
     let sim_pipeline = CAPipeline::new(vulkano_context.compute_queue());
     // Create simple orthographic camera
     let camera = OrthographicCamera::default();
+    // Simulation performance timer
+    let perf_timer = PerformanceTimer::new();
+    let render_timer = PerformanceTimer::new();
     // Insert resources
     commands.insert_resource(fill_screen);
     commands.insert_resource(sim_pipeline);
@@ -120,6 +125,8 @@ fn setup(
     commands.insert_resource(DynamicSettings::default());
     commands.insert_resource(PreviousMousePos(None));
     commands.insert_resource(CurrentMousePos(None));
+    commands.insert_resource(SimTimer(perf_timer));
+    commands.insert_resource(RenderTimer(render_timer));
 }
 
 fn draw_matter(
@@ -137,8 +144,14 @@ fn draw_matter(
     }
 }
 
-fn simulate(mut sim_pipeline: ResMut<CAPipeline>, settings: Res<DynamicSettings>) {
+fn simulate(
+    mut sim_pipeline: ResMut<CAPipeline>,
+    settings: Res<DynamicSettings>,
+    mut sim_timer: ResMut<SimTimer>,
+) {
+    sim_timer.0.start();
     sim_pipeline.step(settings.move_steps, settings.is_paused);
+    sim_timer.0.time_it();
 }
 
 fn render(
@@ -146,7 +159,10 @@ fn render(
     mut fill_screen: ResMut<FillScreenRenderPass>,
     sim_pipeline: Res<CAPipeline>,
     camera: Res<OrthographicCamera>,
+    mut render_timer: ResMut<RenderTimer>,
 ) {
+    render_timer.0.start();
+
     let window_renderer = vulkano_windows.get_primary_window_renderer_mut().unwrap();
     // Start frame
     let before = match window_renderer.start_frame() {
@@ -178,6 +194,8 @@ fn render(
 
     // Finish Frame
     window_renderer.finish_frame(after_gui);
+
+    render_timer.0.time_it();
 }
 
 fn update_camera(windows: Res<Windows>, mut camera: ResMut<OrthographicCamera>) {
