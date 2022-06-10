@@ -3,7 +3,7 @@ use rand::Rng;
 use crate::utils::u32_rgba_to_u8_rgba;
 
 #[repr(u8)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum MatterId {
     Empty = 0,
     Sand = 1,
@@ -59,7 +59,11 @@ pub struct MatterWithColor {
 
 impl MatterWithColor {
     pub fn new(matter_id: MatterId) -> MatterWithColor {
-        let color = matter_id.gen_variate_color_rgba_u8();
+        let color = if matter_id != MatterId::Empty {
+            matter_id.gen_variate_color_rgba_u8()
+        } else {
+            [0; 4]
+        };
         MatterWithColor {
             value: ((color[0] as u32) << 24)
                 | ((color[1] as u32) << 16)

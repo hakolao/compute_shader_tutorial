@@ -18,6 +18,7 @@ use bevy_vulkano::{VulkanoContext, VulkanoWindows, VulkanoWinitConfig, VulkanoWi
 use crate::{
     ca_pipeline::CAPipeline,
     camera::OrthographicCamera,
+    gui::user_interface,
     matter::MatterId,
     render::FillScreenRenderPass,
     utils::{cursor_to_world, get_canvas_line, MousePos},
@@ -72,6 +73,8 @@ fn main() {
         // Add needed plugins
         .add_plugin(bevy::core::CorePlugin)
         .add_plugin(bevy::log::LogPlugin)
+        .add_plugin(bevy::diagnostic::DiagnosticsPlugin)
+        .add_plugin(bevy::diagnostic::FrameTimeDiagnosticsPlugin)
         .add_plugin(bevy::input::InputPlugin)
         .add_plugin(VulkanoWinitPlugin)
         .add_startup_system(setup)
@@ -80,6 +83,7 @@ fn main() {
         .add_system(update_camera)
         .add_system(update_mouse)
         .add_system(draw_matter)
+        .add_system(user_interface)
         // Simulate only SIM_FPS times per second
         .add_system_set_to_stage(
             CoreStage::Update,
@@ -143,9 +147,9 @@ fn render(
     sim_pipeline: Res<CAPipeline>,
     camera: Res<OrthographicCamera>,
 ) {
-    let primary_window_renderer = vulkano_windows.get_primary_window_renderer_mut().unwrap();
+    let window_renderer = vulkano_windows.get_primary_window_renderer_mut().unwrap();
     // Start frame
-    let before = match primary_window_renderer.start_frame() {
+    let before = match window_renderer.start_frame() {
         Err(e) => {
             bevy::log::error!("Failed to start frame: {}", e);
             return;
@@ -156,19 +160,24 @@ fn render(
     let canvas_image = sim_pipeline.color_image();
 
     // Render
-    let final_image = primary_window_renderer.final_image();
-    let after_render = fill_screen.draw(
+    let final_image = window_renderer.final_image();
+    let after_images = fill_screen.draw(
         before,
         *camera,
         canvas_image,
-        final_image,
+        final_image.clone(),
         CLEAR_COLOR,
         false,
         true,
     );
 
+    // Draw gui
+    let after_gui = window_renderer
+        .gui()
+        .draw_on_image(after_images, final_image);
+
     // Finish Frame
-    primary_window_renderer.finish_frame(after_render);
+    window_renderer.finish_frame(after_gui);
 }
 
 fn update_camera(windows: Res<Windows>, mut camera: ResMut<OrthographicCamera>) {

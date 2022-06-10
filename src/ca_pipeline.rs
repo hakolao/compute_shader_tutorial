@@ -167,6 +167,9 @@ impl CAPipeline {
                     self.fall_pipeline.clone(),
                     true,
                 );
+                self.move_step += 1;
+            }
+            for _ in 0..move_steps {
                 self.dispatch(
                     &mut command_buffer_builder,
                     self.slide_pipeline.clone(),

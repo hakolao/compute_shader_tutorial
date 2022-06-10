@@ -124,6 +124,12 @@ pub struct MousePos {
 }
 
 impl MousePos {
+    pub fn new(pos: Vec2) -> MousePos {
+        MousePos {
+            world: pos,
+        }
+    }
+
     /// Inverts y and adds half canvas to the position (pixel units)
     pub fn canvas_pos(&self) -> Vec2 {
         self.world + Vec2::new(CANVAS_SIZE_X as f32 / 2.0, CANVAS_SIZE_Y as f32 / 2.0)
