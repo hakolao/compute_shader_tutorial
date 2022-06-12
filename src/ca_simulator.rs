@@ -191,8 +191,6 @@ impl CASimulator {
         if !is_paused {
             for _ in 0..move_steps {
                 self.step_movement(&mut command_buffer_builder, self.fall_pipeline.clone());
-            }
-            for _ in 0..move_steps {
                 self.step_movement(&mut command_buffer_builder, self.slide_pipeline.clone());
             }
         }
