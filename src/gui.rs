@@ -9,7 +9,7 @@ use bevy_vulkano::{
 use strum::IntoEnumIterator;
 
 use crate::{
-    ca_pipeline::CAPipeline,
+    ca_simulator::CASimulator,
     camera::OrthographicCamera,
     matter::MatterId,
     timer::{RenderTimer, SimTimer},
@@ -17,10 +17,12 @@ use crate::{
     DynamicSettings, CANVAS_SIZE_X, CANVAS_SIZE_Y,
 };
 
+/// Give our text a custom size
 fn sized_text(ui: &mut Ui, text: impl Into<String>, size: f32) {
     ui.label(egui::RichText::new(text).size(size));
 }
 
+/// System to generate user interface with egui
 pub fn user_interface(
     vulkano_windows: Res<VulkanoWindows>,
     diagnostics: Res<Diagnostics>,
@@ -29,7 +31,7 @@ pub fn user_interface(
     mut settings: ResMut<DynamicSettings>,
     sim_timer: Res<SimTimer>,
     render_timer: Res<RenderTimer>,
-    simulator: Res<CAPipeline>,
+    simulator: Res<CASimulator>,
 ) {
     let ctx = vulkano_windows
         .get_primary_window_renderer()
@@ -48,6 +50,11 @@ pub fn user_interface(
             sized_text(
                 ui,
                 format!("Grid size: ({},{})", CANVAS_SIZE_X, CANVAS_SIZE_Y),
+                size,
+            );
+            sized_text(
+                ui,
+                format!("Dispatches per step {}", simulator.dispatches_per_step),
                 size,
             );
             sized_text(

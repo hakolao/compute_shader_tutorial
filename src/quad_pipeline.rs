@@ -22,7 +22,7 @@ use crate::{
     vertex::{Mesh, TexturedQuad, TexturedVertex},
 };
 
-/// A subpass pipeline that fills a quad over frame
+/// Pipeline to draw pixel perfect images on quads
 pub struct DrawQuadPipeline {
     gfx_queue: Arc<Queue>,
     pipeline: Arc<GraphicsPipeline>,

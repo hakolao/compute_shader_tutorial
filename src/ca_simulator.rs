@@ -21,6 +21,7 @@ use crate::{
     CANVAS_SIZE_X, CANVAS_SIZE_Y, KERNEL_SIZE_X, KERNEL_SIZE_Y,
 };
 
+/// Creates a grid with empty matter values
 fn empty_grid(
     compute_queue: &Arc<Queue>,
     width: u32,
@@ -35,7 +36,8 @@ fn empty_grid(
     .unwrap()
 }
 
-pub struct CAPipeline {
+/// Cellular automata simulation pipeline
+pub struct CASimulator {
     compute_queue: Arc<Queue>,
     fall_pipeline: Arc<ComputePipeline>,
     slide_pipeline: Arc<ComputePipeline>,
@@ -45,10 +47,13 @@ pub struct CAPipeline {
     image: DeviceImageView,
     pub sim_step: u32,
     move_step: u32,
+    pub dispatches_per_step: u32,
 }
 
-impl CAPipeline {
-    pub fn new(compute_queue: Arc<Queue>) -> CAPipeline {
+impl CASimulator {
+    /// Create new simulator pipeline for a compute queue. Ensure that canvas sizes are divisible by kernel sizes so no pixel
+    /// remains unsimulated.
+    pub fn new(compute_queue: Arc<Queue>) -> CASimulator {
         // In order to not miss any pixels, the following must be true
         assert_eq!(CANVAS_SIZE_X % KERNEL_SIZE_X, 0);
         assert_eq!(CANVAS_SIZE_Y % KERNEL_SIZE_Y, 0);
@@ -96,13 +101,13 @@ impl CAPipeline {
                 ),
             )
         };
-
+        // Create color image
         let image = create_device_image(
             compute_queue.clone(),
             [CANVAS_SIZE_X, CANVAS_SIZE_Y],
             Format::R8G8B8A8_UNORM,
         );
-        CAPipeline {
+        CASimulator {
             compute_queue,
             fall_pipeline,
             slide_pipeline,
@@ -112,21 +117,26 @@ impl CAPipeline {
             image,
             sim_step: 0,
             move_step: 0,
+            dispatches_per_step: 0,
         }
     }
 
+    /// Get canvas image for rendering
     pub fn color_image(&self) -> DeviceImageView {
         self.image.clone()
     }
 
+    /// Are we within simulation bounds?
     fn is_inside(&self, pos: IVec2) -> bool {
         pos.x >= 0 && pos.x < CANVAS_SIZE_X as i32 && pos.y >= 0 && pos.y < CANVAS_SIZE_Y as i32
     }
 
+    /// Index to access our one dimensional grid with two dimensional position
     fn index(&self, pos: IVec2) -> usize {
         (pos.y * CANVAS_SIZE_Y as i32 + pos.x) as usize
     }
 
+    /// Query matter at pos
     pub fn query_matter(&self, pos: IVec2) -> Option<MatterId> {
         if self.is_inside(pos) {
             let matter_in = self.matter_in.read().unwrap();
@@ -137,6 +147,7 @@ impl CAPipeline {
         }
     }
 
+    /// Draw matter line with given radius
     pub fn draw_matter(&mut self, line: &[IVec2], radius: f32, matter: MatterId) {
         let mut matter_in = self.matter_in.write().unwrap();
         for &pos in line.iter() {
@@ -166,7 +177,10 @@ impl CAPipeline {
         }
     }
 
+    /// Step simulation
     pub fn step(&mut self, move_steps: u32, is_paused: bool) {
+        self.dispatches_per_step = 0;
+
         let mut command_buffer_builder = AutoCommandBufferBuilder::primary(
             self.compute_queue.device().clone(),
             self.compute_queue.family(),
@@ -175,7 +189,6 @@ impl CAPipeline {
         .unwrap();
 
         if !is_paused {
-            // Move our sand / powder
             for _ in 0..move_steps {
                 self.step_movement(&mut command_buffer_builder, self.fall_pipeline.clone());
             }
@@ -199,6 +212,7 @@ impl CAPipeline {
         self.sim_step += 1;
     }
 
+    /// Step a movement pipeline. move_step affects the order of sliding direction
     fn step_movement(
         &mut self,
         builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
@@ -208,6 +222,7 @@ impl CAPipeline {
         self.move_step += 1;
     }
 
+    /// Append a pipeline dispatch to our command buffer
     fn dispatch(
         &mut self,
         builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
@@ -242,6 +257,7 @@ impl CAPipeline {
         if swap {
             std::mem::swap(&mut self.matter_in, &mut self.matter_out);
         }
+        self.dispatches_per_step += 1;
     }
 }
 

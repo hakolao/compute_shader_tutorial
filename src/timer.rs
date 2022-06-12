@@ -2,6 +2,7 @@ use std::{collections::VecDeque, time::Instant};
 
 const NUM_TIME_SAMPLES: usize = 150;
 
+/// A simple performance timer with a buffer of delta times to track performance over time
 pub struct PerformanceTimer {
     time: Instant,
     data: VecDeque<f64>,
@@ -52,4 +53,5 @@ impl Default for PerformanceTimer {
 }
 
 pub struct SimTimer(pub PerformanceTimer);
+
 pub struct RenderTimer(pub PerformanceTimer);

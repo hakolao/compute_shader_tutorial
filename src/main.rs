@@ -1,4 +1,4 @@
-mod ca_pipeline;
+mod ca_simulator;
 mod camera;
 mod gui;
 mod matter;
@@ -20,7 +20,7 @@ use bevy_vulkano::{
 };
 
 use crate::{
-    ca_pipeline::CAPipeline,
+    ca_simulator::CASimulator,
     camera::OrthographicCamera,
     gui::user_interface,
     matter::MatterId,
@@ -31,8 +31,8 @@ use crate::{
 
 pub const WIDTH: f32 = 1920.0;
 pub const HEIGHT: f32 = 1080.0;
-pub const CANVAS_SIZE_X: u32 = 2048;
-pub const CANVAS_SIZE_Y: u32 = 2048;
+pub const CANVAS_SIZE_X: u32 = 512;
+pub const CANVAS_SIZE_Y: u32 = 512;
 pub const KERNEL_SIZE_X: u32 = 32;
 pub const KERNEL_SIZE_Y: u32 = 32;
 pub const SIM_FPS: f64 = 60.0;
@@ -91,7 +91,6 @@ fn main() {
         .add_system(update_camera)
         .add_system(update_mouse)
         .add_system(draw_matter)
-        .add_system(user_interface)
         // Simulate only SIM_FPS times per second
         .add_system_set_to_stage(
             CoreStage::Update,
@@ -99,6 +98,8 @@ fn main() {
                 .with_run_criteria(FixedTimestep::steps_per_second(SIM_FPS))
                 .with_system(simulate),
         )
+        // Gui
+        .add_system(user_interface.after(simulate))
         // Render after update
         .add_system_to_stage(CoreStage::PostUpdate, render)
         .run();
@@ -118,7 +119,7 @@ fn setup(
     );
 
     // Use same queue for compute
-    let sim_pipeline = CAPipeline::new(vulkano_context.compute_queue());
+    let sim_pipeline = CASimulator::new(vulkano_context.compute_queue());
     // Create simple orthographic camera
     let mut camera = OrthographicCamera::default();
     // Zoom camera to fit vertical pixels
@@ -148,8 +149,9 @@ fn setup(
     }
 }
 
+/// Draw matter to our grid
 fn draw_matter(
-    mut sim_pipeline: ResMut<CAPipeline>,
+    mut simulator: ResMut<CASimulator>,
     prev: Res<PreviousMousePos>,
     current: Res<CurrentMousePos>,
     settings: Res<DynamicSettings>,
@@ -158,13 +160,14 @@ fn draw_matter(
     if let Some(current) = current.0 {
         if mouse_button_input.pressed(MouseButton::Left) {
             let line = get_canvas_line(prev.0, current);
-            sim_pipeline.draw_matter(&line, settings.brush_radius as f32, settings.draw_matter);
+            simulator.draw_matter(&line, settings.brush_radius as f32, settings.draw_matter);
         }
     }
 }
 
+/// Step simulation
 fn simulate(
-    mut sim_pipeline: ResMut<CAPipeline>,
+    mut sim_pipeline: ResMut<CASimulator>,
     settings: Res<DynamicSettings>,
     mut sim_timer: ResMut<SimTimer>,
 ) {
@@ -173,10 +176,11 @@ fn simulate(
     sim_timer.0.time_it();
 }
 
+/// Render the simulation
 fn render(
     mut vulkano_windows: ResMut<VulkanoWindows>,
     mut fill_screen: ResMut<FillScreenRenderPass>,
-    sim_pipeline: Res<CAPipeline>,
+    sim_pipeline: Res<CASimulator>,
     camera: Res<OrthographicCamera>,
     mut render_timer: ResMut<RenderTimer>,
 ) {
@@ -217,11 +221,13 @@ fn render(
     render_timer.0.time_it();
 }
 
+/// Update camera (if window is resized)
 fn update_camera(windows: Res<Windows>, mut camera: ResMut<OrthographicCamera>) {
     let window = windows.get_primary().unwrap();
     camera.update(window.width(), window.height());
 }
 
+/// Update mouse position
 fn update_mouse(
     windows: Res<Windows>,
     mut _prev: ResMut<PreviousMousePos>,
@@ -237,6 +243,7 @@ fn update_mouse(
     }
 }
 
+/// Input actions for camera movement, zoom and pausing
 fn input_actions(
     time: Res<Time>,
     mut camera: ResMut<OrthographicCamera>,

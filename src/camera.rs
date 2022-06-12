@@ -14,7 +14,7 @@ pub const OPENGL_TO_VULKAN_MATRIX: Mat4 = const_mat4!([
 
 const Z_POS: f32 = -10.0;
 
-/// An orthographic camera that cannot move :)
+/// A simple orthographic camera
 #[derive(Debug, Copy, Clone)]
 pub struct OrthographicCamera {
     pub pos: Vec2,
@@ -28,6 +28,7 @@ pub struct OrthographicCamera {
 }
 
 impl OrthographicCamera {
+    /// After window size changes, update our camera
     pub fn update(&mut self, width: f32, height: f32) {
         let half_width = width / 2.0;
         let half_height = height / 2.0;
@@ -37,6 +38,7 @@ impl OrthographicCamera {
         self.bottom = -half_height;
     }
 
+    /// Get world to screen matrix to be passed to our rendering
     pub fn world_to_screen(&self) -> Mat4 {
         (OPENGL_TO_VULKAN_MATRIX
             * Mat4::orthographic_rh(
@@ -50,6 +52,7 @@ impl OrthographicCamera {
             * Transform::from_translation(self.pos.extend(Z_POS)).compute_matrix()
     }
 
+    /// Approximately zoom to fit our canvas size so that it's large enough in the beginning
     pub fn zoom_to_fit_vertical_pixels(
         &mut self,
         visible_vertical_pixels: u32,

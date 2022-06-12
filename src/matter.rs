@@ -6,6 +6,7 @@ use crate::{
     EMPTY_COLOR, GREY_SCALE,
 };
 
+/// Matter Id representing matter that we simulate
 #[repr(u8)]
 #[derive(EnumIter, Debug, Copy, Clone, Eq, PartialEq)]
 pub enum MatterId {
@@ -62,12 +63,14 @@ impl MatterId {
     }
 }
 
+/// Matter data where first 3 bytes are saved for color and last 4th byte is saved for matter id
 #[derive(Default, Copy, Clone)]
 pub struct MatterWithColor {
     pub value: u32,
 }
 
 impl MatterWithColor {
+    /// Creates a new matter with color from matter id giving it a slightly randomized color
     pub fn new(matter_id: MatterId) -> MatterWithColor {
         let color = if matter_id != MatterId::Empty {
             matter_id.gen_variate_color_rgba_u8()
