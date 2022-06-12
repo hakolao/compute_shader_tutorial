@@ -3,7 +3,8 @@ Specialization constants
 */
 layout(constant_id = 0) const int canvas_size_x = 1;
 layout(constant_id = 1) const int canvas_size_y = 1;
-layout(local_size_x_id = 2, local_size_y_id = 3, local_size_z = 1) in;
+layout(constant_id = 2) const uint empty_matter = 1;
+layout(local_size_x_id = 3, local_size_y_id = 4, local_size_z = 1) in;
 
 /*
 Buffers
@@ -81,7 +82,7 @@ Matter get_neighbor(ivec2 pos, int dir) {
     if (is_inside_sim_canvas(neighbor_pos)) {
         return read_matter(neighbor_pos);
     } else {
-        return new_matter(0);
+        return new_matter(empty_matter);
     }
 }
 

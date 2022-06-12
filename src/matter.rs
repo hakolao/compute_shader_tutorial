@@ -1,7 +1,10 @@
 use rand::Rng;
 use strum_macros::EnumIter;
 
-use crate::utils::u32_rgba_to_u8_rgba;
+use crate::{
+    utils::{grey_scale_u32, u32_rgba_to_u8_rgba, u8_rgba_to_u32_rgba},
+    EMPTY_COLOR, GREY_SCALE,
+};
 
 #[repr(u8)]
 #[derive(EnumIter, Debug, Copy, Clone, Eq, PartialEq)]
@@ -26,11 +29,15 @@ impl From<u8> for MatterId {
 impl MatterId {
     fn color_rgba_u8(&self) -> [u8; 4] {
         let color = match *self {
-            MatterId::Empty => 0x0,
+            MatterId::Empty => EMPTY_COLOR,
             MatterId::Sand => 0xc2b280ff,
             MatterId::Wood => 0xba8c63ff,
         };
-        u32_rgba_to_u8_rgba(color)
+        if GREY_SCALE {
+            u32_rgba_to_u8_rgba(grey_scale_u32(color))
+        } else {
+            u32_rgba_to_u8_rgba(color)
+        }
     }
 
     fn gen_variate_color_rgba_u8(&self) -> [u8; 4] {
@@ -65,13 +72,10 @@ impl MatterWithColor {
         let color = if matter_id != MatterId::Empty {
             matter_id.gen_variate_color_rgba_u8()
         } else {
-            [0; 4]
+            matter_id.color_rgba_u8()
         };
         MatterWithColor {
-            value: ((color[0] as u32) << 24)
-                | ((color[1] as u32) << 16)
-                | ((color[2] as u32) << 8)
-                | (matter_id as u32 & 255),
+            value: u8_rgba_to_u32_rgba(color[0], color[1], color[2], matter_id as u8),
         }
     }
 

@@ -30,7 +30,7 @@ fn empty_grid(
         compute_queue.device().clone(),
         BufferUsage::all(),
         false,
-        vec![0; (width * height) as usize],
+        vec![MatterWithColor::new(MatterId::Empty).value; (width * height) as usize],
     )
     .unwrap()
 }
@@ -59,8 +59,9 @@ impl CAPipeline {
         let spec_const = fall_empty_cs::SpecializationConstants {
             canvas_size_x: CANVAS_SIZE_X as i32,
             canvas_size_y: CANVAS_SIZE_Y as i32,
-            constant_2: KERNEL_SIZE_X,
-            constant_3: KERNEL_SIZE_Y,
+            empty_matter: MatterWithColor::new(MatterId::Empty).value,
+            constant_3: KERNEL_SIZE_X,
+            constant_4: KERNEL_SIZE_Y,
         };
 
         // Create pipelines

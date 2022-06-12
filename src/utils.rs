@@ -112,6 +112,20 @@ pub fn u32_rgba_to_u8_rgba(num: u32) -> [u8; 4] {
     [r as u8, g as u8, b as u8, a as u8]
 }
 
+pub fn u8_rgba_to_u32_rgba(r: u8, g: u8, b: u8, a: u8) -> u32 {
+    ((r as u32) << 24) | ((g as u32) << 16) | ((b as u32) << 8) | (a as u32 & 255)
+}
+
+/// https://stackoverflow.com/questions/42516203/converting-rgba-image-to-grayscale-golang
+pub fn grey_scale_u32(color: u32) -> u32 {
+    let color = u32_rgba_to_u8_rgba(color);
+    let r = (0.299 * color[0] as f32) as u8;
+    let g = (0.587 * color[1] as f32) as u8;
+    let b = (0.114 * color[2] as f32) as u8;
+    let y = r + g + b;
+    u8_rgba_to_u32_rgba(y, y, y, 255)
+}
+
 pub fn cursor_to_world(window: &Window, camera_pos: Vec2, camera_scale: f32) -> Vec2 {
     (window.cursor_position().unwrap() - Vec2::new(window.width() / 2.0, window.height() / 2.0))
         * camera_scale
