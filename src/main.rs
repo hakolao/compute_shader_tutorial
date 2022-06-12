@@ -29,12 +29,12 @@ use crate::{
     utils::{cursor_to_world, get_canvas_line, MousePos},
 };
 
-pub const WIDTH: f32 = 512.0;
-pub const HEIGHT: f32 = 512.0;
+pub const WIDTH: f32 = 1920.0;
+pub const HEIGHT: f32 = 1080.0;
+pub const CANVAS_SIZE_X: u32 = 2048;
+pub const CANVAS_SIZE_Y: u32 = 2048;
 pub const KERNEL_SIZE_X: u32 = 32;
 pub const KERNEL_SIZE_Y: u32 = 32;
-pub const CANVAS_SIZE_X: u32 = WIDTH as u32;
-pub const CANVAS_SIZE_Y: u32 = HEIGHT as u32;
 pub const SIM_FPS: f64 = 60.0;
 /// Grey scale theme for cool looks
 pub const GREY_SCALE: bool = true;
@@ -120,7 +120,9 @@ fn setup(
     // Use same queue for compute
     let sim_pipeline = CAPipeline::new(vulkano_context.compute_queue());
     // Create simple orthographic camera
-    let camera = OrthographicCamera::default();
+    let mut camera = OrthographicCamera::default();
+    // Zoom camera to fit vertical pixels
+    camera.zoom_to_fit_vertical_pixels(CANVAS_SIZE_Y, HEIGHT as u32);
     // Simulation performance timer
     let perf_timer = PerformanceTimer::new();
     let render_timer = PerformanceTimer::new();
