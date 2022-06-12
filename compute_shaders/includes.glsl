@@ -32,28 +32,20 @@ int get_index(ivec2 pos) {
     return pos.y * canvas_size_y + pos.x;
 }
 
-bool is_at_border_top() {
-    ivec2 local_pos = ivec2(gl_GlobalInvocationID.xy);
-    return local_pos.y == canvas_size_y - 1;
+bool is_at_border_top(ivec2 pos) {
+    return pos.y == canvas_size_y - 1;
 }
 
-bool is_at_border_bottom() {
-    ivec2 local_pos = ivec2(gl_GlobalInvocationID.xy);
-    return local_pos.y == 0;
+bool is_at_border_bottom(ivec2 pos) {
+    return pos.y == 0;
 }
 
-bool is_at_border_right() {
-    ivec2 local_pos = ivec2(gl_GlobalInvocationID.xy);
-    return local_pos.x == canvas_size_x - 1;
+bool is_at_border_right(ivec2 pos) {
+    return pos.x == canvas_size_x - 1;
 }
 
-bool is_at_border_left() {
-    ivec2 local_pos = ivec2(gl_GlobalInvocationID.xy);
-    return local_pos.x == 0;
-}
-
-uint get_matter_in(ivec2 pos) {
-    return matter_in[get_index(pos)];
+bool is_at_border_left(ivec2 pos) {
+    return pos.x == 0;
 }
 
 bool is_inside_sim_canvas(ivec2 pos) {
@@ -62,7 +54,7 @@ bool is_inside_sim_canvas(ivec2 pos) {
 }
 
 Matter read_matter(ivec2 pos) {
-    return new_matter(get_matter_in(pos));
+    return new_matter(matter_in[get_index(pos)]);
 }
 
 uint matter_to_uint(Matter matter) {

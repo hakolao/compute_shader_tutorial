@@ -7,9 +7,9 @@ void fall_empty(ivec2 pos) {
     Matter up = get_neighbor(pos, UP);
     Matter down = get_neighbor(pos, DOWN);
     Matter m = current;
-    if (!is_at_border_top() && falls_on_empty(up, current)) {
+    if (!is_at_border_top(pos) && falls_on_empty(up, current)) {
         m = up;
-    } else if (!is_at_border_bottom() && falls_on_empty(current, down)) {
+    } else if (!is_at_border_bottom(pos) && falls_on_empty(current, down)) {
         m = down;
     }
     write_matter(pos, m);
