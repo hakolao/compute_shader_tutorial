@@ -30,6 +30,20 @@ pub const KERNEL_SIZE_Y: u32 = 32;
 pub const CLEAR_COLOR: [f32; 4] = [0.2; 4];
 pub const CAMERA_MOVE_SPEED: f32 = 200.0;
 
+pub struct DynamicSettings {
+    pub brush_radius: f32,
+    pub draw_matter: u32,
+}
+
+impl Default for DynamicSettings {
+    fn default() -> Self {
+        Self {
+            brush_radius: 4.0,
+            draw_matter: 0xff0000ff,
+        }
+    }
+}
+
 fn main() {
     App::new()
         .insert_resource(VulkanoWinitConfig::default())
@@ -84,9 +98,9 @@ fn setup(
     commands.insert_resource(fill_screen);
     commands.insert_resource(camera);
     commands.insert_resource(simulator);
-    // Add mouse position resources
     commands.insert_resource(PreviousMousePos(None));
     commands.insert_resource(CurrentMousePos(None));
+    commands.insert_resource(DynamicSettings::default());
 }
 
 /// Step simulation
@@ -178,12 +192,12 @@ fn draw_matter(
     prev: Res<PreviousMousePos>,
     current: Res<CurrentMousePos>,
     mouse_button_input: Res<Input<MouseButton>>,
+    settings: Res<DynamicSettings>,
 ) {
     if let Some(current) = current.0 {
         if mouse_button_input.pressed(MouseButton::Left) {
             let line = get_canvas_line(prev.0, current);
-            // Draw line from a to b at radius 4.0 with matter color of red
-            simulator.draw_matter(&line, 4.0, 0xff0000ff);
+            simulator.draw_matter(&line, settings.brush_radius, settings.draw_matter);
         }
     }
 }
