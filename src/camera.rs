@@ -51,6 +51,16 @@ impl OrthographicCamera {
             ))
             * Transform::from_translation(self.pos.extend(Z_POS)).compute_matrix()
     }
+
+    /// Approximately zoom to fit our canvas size so that it's large enough in the beginning
+    pub fn zoom_to_fit_vertical_pixels(
+        &mut self,
+        visible_vertical_pixels: u32,
+        actual_vertical_pixels: u32,
+    ) {
+        let pixels_ratio = visible_vertical_pixels as f32 / actual_vertical_pixels as f32;
+        self.scale = pixels_ratio;
+    }
 }
 
 impl Default for OrthographicCamera {

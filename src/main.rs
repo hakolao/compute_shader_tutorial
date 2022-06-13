@@ -1,3 +1,4 @@
+mod ca_simulator;
 mod camera;
 mod gui;
 mod quad_pipeline;
@@ -5,24 +6,28 @@ mod render;
 mod utils;
 mod vertex;
 
-use std::sync::Arc;
-
 use bevy::{
     input::{mouse::MouseWheel, system::exit_on_esc_system},
     prelude::*,
     window::WindowMode,
 };
-use bevy_vulkano::{
-    texture_from_file, VulkanoContext, VulkanoWindows, VulkanoWinitConfig, VulkanoWinitPlugin,
-    DEFAULT_IMAGE_FORMAT,
-};
-use vulkano::image::ImageViewAbstract;
+use bevy_vulkano::{VulkanoContext, VulkanoWindows, VulkanoWinitConfig, VulkanoWinitPlugin};
 
-use crate::{camera::OrthographicCamera, gui::user_interface, render::FillScreenRenderPass};
+use crate::{
+    ca_simulator::CASimulator,
+    camera::OrthographicCamera,
+    gui::user_interface,
+    render::FillScreenRenderPass,
+    utils::{cursor_to_world, get_canvas_line, MousePos},
+};
 
 pub const WIDTH: f32 = 1920.0;
 pub const HEIGHT: f32 = 1080.0;
-pub const CLEAR_COLOR: [f32; 4] = [0.0; 4];
+pub const CANVAS_SIZE_X: u32 = 512;
+pub const CANVAS_SIZE_Y: u32 = 512;
+pub const KERNEL_SIZE_X: u32 = 32;
+pub const KERNEL_SIZE_Y: u32 = 32;
+pub const CLEAR_COLOR: [f32; 4] = [0.2; 4];
 pub const CAMERA_MOVE_SPEED: f32 = 200.0;
 
 fn main() {
@@ -48,14 +53,15 @@ fn main() {
         .add_system(exit_on_esc_system)
         .add_system(input_actions)
         .add_system(update_camera)
+        .add_system(update_mouse)
+        .add_system(draw_matter)
+        .add_system(simulate)
         // Gui
         .add_system(user_interface)
         // Render after update
         .add_system_to_stage(CoreStage::PostUpdate, render)
         .run();
 }
-
-struct TreeImage(Arc<dyn ImageViewAbstract + Send + Sync + 'static>);
 
 /// Creates our simulation & render pipelines
 fn setup(
@@ -69,18 +75,23 @@ fn setup(
         vulkano_context.graphics_queue(),
         primary_window_renderer.swapchain_format(),
     );
-    let tree_image = texture_from_file(
-        vulkano_context.graphics_queue(),
-        include_bytes!("../assets/tree.png"),
-        DEFAULT_IMAGE_FORMAT,
-    )
-    .unwrap();
+    let simulator = CASimulator::new(vulkano_context.compute_queue());
     // Create simple orthographic camera
-    let camera = OrthographicCamera::default();
+    let mut camera = OrthographicCamera::default();
+    // Zoom camera to fit vertical pixels
+    camera.zoom_to_fit_vertical_pixels(CANVAS_SIZE_Y, HEIGHT as u32);
     // Insert resources
     commands.insert_resource(fill_screen);
     commands.insert_resource(camera);
-    commands.insert_resource(TreeImage(tree_image));
+    commands.insert_resource(simulator);
+    // Add mouse position resources
+    commands.insert_resource(PreviousMousePos(None));
+    commands.insert_resource(CurrentMousePos(None));
+}
+
+/// Step simulation
+fn simulate(mut sim_pipeline: ResMut<CASimulator>) {
+    sim_pipeline.step();
 }
 
 /// Render the simulation
@@ -88,7 +99,7 @@ fn render(
     mut vulkano_windows: ResMut<VulkanoWindows>,
     mut fill_screen: ResMut<FillScreenRenderPass>,
     camera: Res<OrthographicCamera>,
-    tree_image: Res<TreeImage>,
+    simulator: Res<CASimulator>,
 ) {
     let window_renderer = vulkano_windows.get_primary_window_renderer_mut().unwrap();
     // Start frame
@@ -100,18 +111,18 @@ fn render(
         Ok(f) => f,
     };
 
-    let tree_image = tree_image.0.clone();
+    let canvas_image = simulator.color_image();
 
     // Render
     let final_image = window_renderer.final_image();
     let after_images = fill_screen.draw(
         before,
         *camera,
-        tree_image,
+        canvas_image,
         final_image.clone(),
         CLEAR_COLOR,
         false,
-        false,
+        true,
     );
 
     // Draw gui
@@ -158,5 +169,45 @@ fn input_actions(
         } else {
             camera.scale *= 1.0 / 1.05;
         }
+    }
+}
+
+/// Draw matter to our grid
+fn draw_matter(
+    mut simulator: ResMut<CASimulator>,
+    prev: Res<PreviousMousePos>,
+    current: Res<CurrentMousePos>,
+    mouse_button_input: Res<Input<MouseButton>>,
+) {
+    if let Some(current) = current.0 {
+        if mouse_button_input.pressed(MouseButton::Left) {
+            let line = get_canvas_line(prev.0, current);
+            // Draw line from a to b at radius 4.0 with matter color of red
+            simulator.draw_matter(&line, 4.0, 0xff0000ff);
+        }
+    }
+}
+
+/// Mouse position from last frame
+#[derive(Debug, Copy, Clone)]
+pub struct PreviousMousePos(pub Option<MousePos>);
+
+/// Mouse position now
+#[derive(Debug, Copy, Clone)]
+pub struct CurrentMousePos(pub Option<MousePos>);
+
+/// Update mouse position
+fn update_mouse(
+    windows: Res<Windows>,
+    mut _prev: ResMut<PreviousMousePos>,
+    mut _current: ResMut<CurrentMousePos>,
+    camera: Res<OrthographicCamera>,
+) {
+    _prev.0 = _current.0;
+    let primary = windows.get_primary().unwrap();
+    if primary.cursor_position().is_some() {
+        _current.0 = Some(MousePos {
+            world: cursor_to_world(primary, camera.pos, camera.scale),
+        });
     }
 }
