@@ -8,6 +8,8 @@ use vulkano::{
     sampler::{Filter, Sampler, SamplerAddressMode, SamplerCreateInfo, SamplerMipmapMode},
 };
 
+/// Creates a descriptor set for sampled image descriptor set using nearest sampling. This means that the image
+/// will be pixel perfect.
 pub fn create_image_sampler_nearest_descriptor_set(
     device: Arc<Device>,
     pipeline: Arc<GraphicsPipeline>,
