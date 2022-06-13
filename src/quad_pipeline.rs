@@ -22,7 +22,7 @@ use crate::{
     vertex::{Mesh, TexturedQuad, TexturedVertex},
 };
 
-/// A subpass pipeline that fills a quad over frame
+/// Pipeline to draw pixel perfect images on quads
 pub struct DrawQuadPipeline {
     gfx_queue: Arc<Queue>,
     pipeline: Arc<GraphicsPipeline>,
@@ -58,6 +58,8 @@ impl DrawQuadPipeline {
         viewport_dimensions: [u32; 2],
         camera: OrthographicCamera,
         image: Arc<dyn ImageViewAbstract>,
+        flip_x: bool,
+        flip_y: bool,
     ) -> SecondaryAutoCommandBuffer {
         let mut builder = AutoCommandBufferBuilder::secondary_graphics(
             self.gfx_queue.device().clone(),
@@ -70,7 +72,10 @@ impl DrawQuadPipeline {
         let push_constants = vs::ty::PushConstants {
             world_to_screen: camera.world_to_screen().to_cols_array_2d(),
             // Scale transforms our 1.0 sized quad to actual pixel size in screen space
-            scale: [dims.width() as f32, dims.height() as f32],
+            scale: [
+                dims.width() as f32 * if flip_x { -1.0 } else { 1.0 },
+                dims.height() as f32 * if flip_y { -1.0 } else { 1.0 },
+            ],
         };
 
         let image_sampler_descriptor_set = create_image_sampler_nearest_descriptor_set(

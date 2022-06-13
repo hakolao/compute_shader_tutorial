@@ -1,4 +1,5 @@
 mod camera;
+mod gui;
 mod quad_pipeline;
 mod render;
 mod utils;
@@ -6,16 +7,23 @@ mod vertex;
 
 use std::sync::Arc;
 
-use bevy::{input::system::exit_on_esc_system, prelude::*, window::WindowMode};
+use bevy::{
+    input::{mouse::MouseWheel, system::exit_on_esc_system},
+    prelude::*,
+    window::WindowMode,
+};
 use bevy_vulkano::{
-    texture_from_file, VulkanoWindows, VulkanoWinitConfig, VulkanoWinitPlugin, DEFAULT_IMAGE_FORMAT,
+    texture_from_file, VulkanoContext, VulkanoWindows, VulkanoWinitConfig, VulkanoWinitPlugin,
+    DEFAULT_IMAGE_FORMAT,
 };
 use vulkano::image::ImageViewAbstract;
 
-use crate::{camera::OrthographicCamera, render::FillScreenRenderPass};
+use crate::{camera::OrthographicCamera, gui::user_interface, render::FillScreenRenderPass};
 
-pub const WIDTH: f32 = 1024.0;
-pub const HEIGHT: f32 = 1024.0;
+pub const WIDTH: f32 = 1920.0;
+pub const HEIGHT: f32 = 1080.0;
+pub const CLEAR_COLOR: [f32; 4] = [0.0; 4];
+pub const CAMERA_MOVE_SPEED: f32 = 200.0;
 
 fn main() {
     App::new()
@@ -32,28 +40,37 @@ fn main() {
         // Add needed plugins
         .add_plugin(bevy::core::CorePlugin)
         .add_plugin(bevy::log::LogPlugin)
+        .add_plugin(bevy::diagnostic::DiagnosticsPlugin)
+        .add_plugin(bevy::diagnostic::FrameTimeDiagnosticsPlugin)
         .add_plugin(bevy::input::InputPlugin)
         .add_plugin(VulkanoWinitPlugin)
         .add_startup_system(setup)
         .add_system(exit_on_esc_system)
-        .add_system(render_system)
+        .add_system(input_actions)
+        .add_system(update_camera)
+        // Gui
+        .add_system(user_interface)
+        // Render after update
+        .add_system_to_stage(CoreStage::PostUpdate, render)
         .run();
 }
 
-pub struct TreeImage(pub Arc<dyn ImageViewAbstract + Send + Sync + 'static>);
+struct TreeImage(Arc<dyn ImageViewAbstract + Send + Sync + 'static>);
 
 /// Creates our simulation & render pipelines
-fn setup(mut commands: Commands, vulkano_windows: Res<VulkanoWindows>) {
+fn setup(
+    mut commands: Commands,
+    vulkano_windows: Res<VulkanoWindows>,
+    vulkano_context: Res<VulkanoContext>,
+) {
     let primary_window_renderer = vulkano_windows.get_primary_window_renderer().unwrap();
-    let gfx_queue = primary_window_renderer.graphics_queue();
     // Create our render pass
     let fill_screen = FillScreenRenderPass::new(
-        gfx_queue.clone(),
+        vulkano_context.graphics_queue(),
         primary_window_renderer.swapchain_format(),
     );
-    // Create a tree image to test pipeline
     let tree_image = texture_from_file(
-        gfx_queue,
+        vulkano_context.graphics_queue(),
         include_bytes!("../assets/tree.png"),
         DEFAULT_IMAGE_FORMAT,
     )
@@ -62,20 +79,20 @@ fn setup(mut commands: Commands, vulkano_windows: Res<VulkanoWindows>) {
     let camera = OrthographicCamera::default();
     // Insert resources
     commands.insert_resource(fill_screen);
-    commands.insert_resource(TreeImage(tree_image));
     commands.insert_resource(camera);
+    commands.insert_resource(TreeImage(tree_image));
 }
 
-fn render_system(
-    windows: Res<Windows>,
+/// Render the simulation
+fn render(
     mut vulkano_windows: ResMut<VulkanoWindows>,
     mut fill_screen: ResMut<FillScreenRenderPass>,
+    camera: Res<OrthographicCamera>,
     tree_image: Res<TreeImage>,
-    mut camera: ResMut<OrthographicCamera>,
 ) {
-    let primary_window_renderer = vulkano_windows.get_primary_window_renderer_mut().unwrap();
+    let window_renderer = vulkano_windows.get_primary_window_renderer_mut().unwrap();
     // Start frame
-    let before = match primary_window_renderer.start_frame() {
+    let before = match window_renderer.start_frame() {
         Err(e) => {
             bevy::log::error!("Failed to start frame: {}", e);
             return;
@@ -83,15 +100,63 @@ fn render_system(
         Ok(f) => f,
     };
 
-    let color_image = tree_image.0.clone();
-    let final_image = primary_window_renderer.final_image();
-    // Update camera
-    let window = windows.get_primary().unwrap();
-    camera.update(window.width(), window.height());
+    let tree_image = tree_image.0.clone();
+
     // Render
-    let after_render =
-        fill_screen.render_image_to_screen(before, *camera, color_image, final_image);
+    let final_image = window_renderer.final_image();
+    let after_images = fill_screen.draw(
+        before,
+        *camera,
+        tree_image,
+        final_image.clone(),
+        CLEAR_COLOR,
+        false,
+        false,
+    );
+
+    // Draw gui
+    let after_gui = window_renderer
+        .gui()
+        .draw_on_image(after_images, final_image);
 
     // Finish Frame
-    primary_window_renderer.finish_frame(after_render);
+    window_renderer.finish_frame(after_gui);
+}
+
+/// Update camera (if window is resized)
+fn update_camera(windows: Res<Windows>, mut camera: ResMut<OrthographicCamera>) {
+    let window = windows.get_primary().unwrap();
+    camera.update(window.width(), window.height());
+}
+
+/// Input actions for camera movement, zoom and pausing
+fn input_actions(
+    time: Res<Time>,
+    mut camera: ResMut<OrthographicCamera>,
+    keyboard_input: Res<Input<KeyCode>>,
+    mut mouse_input_events: EventReader<MouseWheel>,
+) {
+    // Move camera with arrows & WASD
+    let up = keyboard_input.pressed(KeyCode::W) || keyboard_input.pressed(KeyCode::Up);
+    let down = keyboard_input.pressed(KeyCode::S) || keyboard_input.pressed(KeyCode::Down);
+    let left = keyboard_input.pressed(KeyCode::A) || keyboard_input.pressed(KeyCode::Left);
+    let right = keyboard_input.pressed(KeyCode::D) || keyboard_input.pressed(KeyCode::Right);
+
+    let x_axis = -(right as i8) + left as i8;
+    let y_axis = -(up as i8) + down as i8;
+
+    let mut move_delta = Vec2::new(x_axis as f32, y_axis as f32);
+    if move_delta != Vec2::ZERO {
+        move_delta /= move_delta.length();
+        camera.pos += move_delta * time.delta_seconds() * CAMERA_MOVE_SPEED;
+    }
+
+    // Zoom camera with mouse scroll
+    for e in mouse_input_events.iter() {
+        if e.y < 0.0 {
+            camera.scale *= 1.05;
+        } else {
+            camera.scale *= 1.0 / 1.05;
+        }
+    }
 }
