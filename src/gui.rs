@@ -76,7 +76,7 @@ pub fn user_interface(
                 size,
             );
             ui.heading("Settings");
-            ui.add(egui::Slider::new(&mut settings.brush_radius, 1..=20).text("Brush Size"));
+            ui.add(egui::Slider::new(&mut settings.brush_radius, 0.5..=20.0).text("Brush Size"));
             ui.add(egui::Slider::new(&mut settings.move_steps, 1..=5).text("Move Steps"));
             // Selectable matter
             egui::ComboBox::from_label("Matter")

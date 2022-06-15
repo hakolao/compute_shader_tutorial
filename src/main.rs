@@ -45,7 +45,7 @@ pub const EMPTY_COLOR: u32 = if GREY_SCALE { 0xffffffff } else { 0x0 };
 pub const CAMERA_MOVE_SPEED: f32 = 200.0;
 
 pub struct DynamicSettings {
-    pub brush_radius: u32,
+    pub brush_radius: f32,
     pub move_steps: u32,
     pub draw_matter: MatterId,
     pub is_paused: bool,
@@ -54,7 +54,7 @@ pub struct DynamicSettings {
 impl Default for DynamicSettings {
     fn default() -> Self {
         Self {
-            brush_radius: 4,
+            brush_radius: 4.0,
             move_steps: 1,
             draw_matter: MatterId::Sand,
             is_paused: false,
@@ -162,7 +162,7 @@ fn draw_matter(
     if let Some(current) = current.0 {
         if mouse_button_input.pressed(MouseButton::Left) {
             let line = get_canvas_line(prev.0, current);
-            simulator.draw_matter(&line, settings.brush_radius as f32, settings.draw_matter);
+            simulator.draw_matter(&line, settings.brush_radius, settings.draw_matter);
         }
     }
 }
