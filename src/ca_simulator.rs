@@ -18,7 +18,7 @@ use vulkano::{
 use crate::{
     matter::{MatterId, MatterWithColor},
     utils::{create_compute_pipeline, image_desc_set, storage_buffer_desc},
-    CANVAS_SIZE_X, CANVAS_SIZE_Y, KERNEL_SIZE_X, KERNEL_SIZE_Y,
+    CANVAS_SIZE_X, CANVAS_SIZE_Y, LOCAL_SIZE_X, LOCAL_SIZE_Y, NUM_WORK_GROUPS_X, NUM_WORK_GROUPS_Y,
 };
 
 /// Creates a grid with empty matter values
@@ -55,8 +55,8 @@ impl CASimulator {
     /// remains unsimulated.
     pub fn new(compute_queue: Arc<Queue>) -> CASimulator {
         // In order to not miss any pixels, the following must be true
-        assert_eq!(CANVAS_SIZE_X % KERNEL_SIZE_X, 0);
-        assert_eq!(CANVAS_SIZE_Y % KERNEL_SIZE_Y, 0);
+        assert_eq!(CANVAS_SIZE_X % LOCAL_SIZE_X, 0);
+        assert_eq!(CANVAS_SIZE_Y % LOCAL_SIZE_Y, 0);
         let matter_in = empty_grid(&compute_queue, CANVAS_SIZE_X, CANVAS_SIZE_Y);
         let matter_out = empty_grid(&compute_queue, CANVAS_SIZE_X, CANVAS_SIZE_Y);
 
@@ -65,8 +65,8 @@ impl CASimulator {
             canvas_size_x: CANVAS_SIZE_X as i32,
             canvas_size_y: CANVAS_SIZE_Y as i32,
             empty_matter: MatterWithColor::new(MatterId::Empty).value,
-            constant_3: KERNEL_SIZE_X,
-            constant_4: KERNEL_SIZE_Y,
+            constant_3: LOCAL_SIZE_X,
+            constant_4: LOCAL_SIZE_Y,
         };
 
         // Create pipelines
@@ -244,11 +244,7 @@ impl CASimulator {
             .bind_pipeline_compute(pipeline.clone())
             .bind_descriptor_sets(PipelineBindPoint::Compute, pipeline_layout.clone(), 0, set)
             .push_constants(pipeline_layout.clone(), 0, push_constants)
-            .dispatch([
-                CANVAS_SIZE_X / KERNEL_SIZE_X,
-                CANVAS_SIZE_Y / KERNEL_SIZE_Y,
-                1,
-            ])
+            .dispatch([NUM_WORK_GROUPS_X, NUM_WORK_GROUPS_Y, 1])
             .unwrap();
 
         // Double buffering: Swap input and output so the output becomes the input for next frame
