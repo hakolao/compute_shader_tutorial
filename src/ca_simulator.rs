@@ -275,3 +275,45 @@ mod color_cs {
         path: "compute_shaders/color.glsl"
     }
 }
+
+// Most of the tests in a simple project like this can probably be done visually... If it renders right, it's right.
+// However, I'll show here how you can test your shader & compute pass logic. And as the project grows
+// you'll want to be doing more unit testing...
+#[cfg(test)]
+mod tests {
+    use bevy::math::IVec2;
+    use bevy_vulkano::{VulkanoContext, VulkanoWinitConfig};
+
+    use crate::{ca_simulator::CASimulator, matter::MatterId};
+
+    fn test_setup() -> (VulkanoContext, CASimulator) {
+        // Create vulkano context
+        let vulkano_context = VulkanoContext::new(&VulkanoWinitConfig {
+            add_primary_window: false,
+            ..VulkanoWinitConfig::default()
+        });
+        // Create Simulation pipeline
+        let simulator = CASimulator::new(vulkano_context.compute_queue());
+        (vulkano_context, simulator)
+    }
+
+    #[test]
+    fn test_example_sandfall() {
+        let (_ctx, mut simulator) = test_setup();
+        let pos = IVec2::new(10, 10);
+        // Empty matter first
+        assert_eq!(simulator.query_matter(pos), Some(MatterId::Empty));
+        simulator.draw_matter(&[pos], 0.5, MatterId::Sand);
+        // After drawing, We have Sand
+        assert_eq!(simulator.query_matter(pos), Some(MatterId::Sand));
+        // Step once
+        simulator.step(1, false);
+        // Old position is empty
+        assert_eq!(simulator.query_matter(pos), Some(MatterId::Empty));
+        // New position under has Sand
+        assert_eq!(
+            simulator.query_matter(pos + IVec2::new(0, -1)),
+            Some(MatterId::Sand)
+        );
+    }
+}
