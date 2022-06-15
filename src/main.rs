@@ -25,8 +25,10 @@ pub const WIDTH: f32 = 1920.0;
 pub const HEIGHT: f32 = 1080.0;
 pub const CANVAS_SIZE_X: u32 = 512;
 pub const CANVAS_SIZE_Y: u32 = 512;
-pub const KERNEL_SIZE_X: u32 = 32;
-pub const KERNEL_SIZE_Y: u32 = 32;
+pub const LOCAL_SIZE_X: u32 = 32;
+pub const LOCAL_SIZE_Y: u32 = 32;
+pub const NUM_WORK_GROUPS_X: u32 = CANVAS_SIZE_X / LOCAL_SIZE_X;
+pub const NUM_WORK_GROUPS_Y: u32 = CANVAS_SIZE_Y / LOCAL_SIZE_Y;
 pub const CLEAR_COLOR: [f32; 4] = [0.2; 4];
 pub const CAMERA_MOVE_SPEED: f32 = 200.0;
 
