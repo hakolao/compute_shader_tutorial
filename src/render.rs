@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
-use bevy_vulkano::FinalImageView;
+use bevy_vulkano::{DeviceImageView, FinalImageView};
 use vulkano::{
     command_buffer::{AutoCommandBufferBuilder, CommandBufferUsage, SubpassContents},
     device::Queue,
     format::Format,
-    image::{ImageAccess, ImageViewAbstract},
+    image::ImageAccess,
     render_pass::{Framebuffer, FramebufferCreateInfo, RenderPass, Subpass},
     sync::GpuFuture,
 };
@@ -48,12 +48,15 @@ impl FillScreenRenderPass {
 
     /// Place view exactly over swapchain image target.
     /// Texture draw pipeline uses a quad onto which it places the view.
-    pub fn render_image_to_screen<F>(
+    pub fn draw<F>(
         &mut self,
         before_future: F,
         camera: OrthographicCamera,
-        image: Arc<dyn ImageViewAbstract>,
+        image: DeviceImageView,
         target: FinalImageView,
+        clear_color: [f32; 4],
+        flip_x: bool,
+        flip_y: bool,
     ) -> Box<dyn GpuFuture>
     where
         F: GpuFuture + 'static,
@@ -67,7 +70,6 @@ impl FillScreenRenderPass {
         })
         .unwrap();
         // Create primary command buffer builder & begin render pass with black clear color
-        let clear_color = [0.0; 4];
         let mut command_buffer_builder = AutoCommandBufferBuilder::primary(
             self.gfx_queue.device().clone(),
             self.gfx_queue.family(),
@@ -81,9 +83,9 @@ impl FillScreenRenderPass {
             .unwrap();
         // Create secondary command buffer from quad pipeline (subpass) and execute it inside our render pass.
         // Then build the primary command buffer and execute it.
-        let cb = self
-            .quad_pipeline
-            .draw(target_image.width_height(), camera, image);
+        let cb =
+            self.quad_pipeline
+                .draw(target_image.width_height(), camera, image, flip_x, flip_y);
         command_buffer_builder.execute_commands(cb).unwrap();
         command_buffer_builder.end_render_pass().unwrap();
         let command_buffer = command_buffer_builder.build().unwrap();
