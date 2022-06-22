@@ -174,17 +174,34 @@ impl CASimulator {
         pos.x >= 0 && pos.x < CANVAS_SIZE_X as i32 && pos.y >= 0 && pos.y < CANVAS_SIZE_Y as i32
     }
 
-    // /// Query matter at pos
+    fn command_buffer_builder(&self) -> AutoCommandBufferBuilder<PrimaryAutoCommandBuffer> {
+        AutoCommandBufferBuilder::primary(
+            self.compute_queue.device().clone(),
+            self.compute_queue.family(),
+            CommandBufferUsage::OneTimeSubmit,
+        )
+        .unwrap()
+    }
+
+    fn execute(
+        &self,
+        command_buffer_builder: AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
+        wait: bool,
+    ) {
+        let command_buffer = command_buffer_builder.build().unwrap();
+        let finished = command_buffer.execute(self.compute_queue.clone()).unwrap();
+        let future = finished.then_signal_fence_and_flush().unwrap();
+        if wait {
+            future.wait(None).unwrap();
+        }
+    }
+
+    /// Query matter at pos
     pub fn query_matter(&mut self, pos: IVec2) -> Option<MatterId> {
         if self.is_inside(pos) {
             self.query_pos = pos;
             // Build command buffer
-            let mut command_buffer_builder = AutoCommandBufferBuilder::primary(
-                self.compute_queue.device().clone(),
-                self.compute_queue.family(),
-                CommandBufferUsage::OneTimeSubmit,
-            )
-            .unwrap();
+            let mut command_buffer_builder = self.command_buffer_builder();
 
             // Dispatch
             self.dispatch(
@@ -193,13 +210,8 @@ impl CASimulator {
                 false,
             );
 
-            // Execute & finish
-            let command_buffer = command_buffer_builder.build().unwrap();
-            let finished = command_buffer.execute(self.compute_queue.clone()).unwrap();
-            let future = finished.then_signal_fence_and_flush().unwrap();
-
-            // Wait on our future to ensure we are not using the buffer before reading
-            future.wait(None).unwrap();
+            // Execute & finish (wait)
+            self.execute(command_buffer_builder, true);
 
             // Read result
             let query_matter = self.query_matter.read().unwrap();
@@ -218,12 +230,7 @@ impl CASimulator {
         self.draw_radius = radius;
 
         // Build command buffer
-        let mut command_buffer_builder = AutoCommandBufferBuilder::primary(
-            self.compute_queue.device().clone(),
-            self.compute_queue.family(),
-            CommandBufferUsage::OneTimeSubmit,
-        )
-        .unwrap();
+        let mut command_buffer_builder = self.command_buffer_builder();
 
         // Dispatch
         self.dispatch(
@@ -233,19 +240,12 @@ impl CASimulator {
         );
 
         // Execute & finish (no need to wait)
-        let command_buffer = command_buffer_builder.build().unwrap();
-        let finished = command_buffer.execute(self.compute_queue.clone()).unwrap();
-        let _fut = finished.then_signal_fence_and_flush().unwrap();
+        self.execute(command_buffer_builder, false);
     }
 
     /// Step simulation
     pub fn step(&mut self, move_steps: u32, is_paused: bool) {
-        let mut command_buffer_builder = AutoCommandBufferBuilder::primary(
-            self.compute_queue.device().clone(),
-            self.compute_queue.family(),
-            CommandBufferUsage::OneTimeSubmit,
-        )
-        .unwrap();
+        let mut command_buffer_builder = self.command_buffer_builder();
 
         if !is_paused {
             for _ in 0..move_steps {
@@ -261,10 +261,8 @@ impl CASimulator {
             false,
         );
 
-        // Finish
-        let command_buffer = command_buffer_builder.build().unwrap();
-        let finished = command_buffer.execute(self.compute_queue.clone()).unwrap();
-        let _fut = finished.then_signal_fence_and_flush().unwrap();
+        // Execute & finish (no need to wait)
+        self.execute(command_buffer_builder, false);
 
         self.sim_step += 1;
     }
