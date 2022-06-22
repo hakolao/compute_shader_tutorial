@@ -26,7 +26,7 @@ uint variate_color(ivec2 pos, uint color) {
     return rgb;
 }
 
-void draw_matter(ivec2 pos, ivec2 draw_pos, float radius, Matter matter) {
+void draw_matter_circle(ivec2 pos, ivec2 draw_pos, float radius, Matter matter) {
     int y_start = draw_pos.y - int(radius);
     int y_end = draw_pos.y + int(radius);
     int x_start = draw_pos.x - int(radius);
@@ -44,10 +44,26 @@ void draw_matter(ivec2 pos, ivec2 draw_pos, float radius, Matter matter) {
     }
 }
 
+// Line v->w, point p
+// https://stackoverflow.com/questions/849211/shortest-distance-between-a-point-and-a-line-segment
+vec2 closest_point_on_line(vec2 v, vec2 w, vec2 p) {
+    vec2 c = v - w;
+    // length squared
+    float l2 = dot(c, c);
+    if (l2 == 0.0) {
+        return v;
+    }
+    float t = max(0.0, min(1.0, dot(p - v, w - v) / l2));
+    vec2 projection = v + t * (w - v);
+    return projection;
+}
+
 void main() {
-    draw_matter(
-        get_current_sim_pos(),
-        push_constants.draw_pos,
+    ivec2 pos = get_current_sim_pos();
+    vec2 point_on_line = closest_point_on_line(push_constants.draw_pos_start, push_constants.draw_pos_end, pos);
+    draw_matter_circle(
+        pos,
+        ivec2(point_on_line),
         push_constants.draw_radius,
         new_matter(push_constants.draw_matter)
     );

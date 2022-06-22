@@ -26,7 +26,7 @@ use crate::{
     matter::MatterId,
     render::FillScreenRenderPass,
     timer::{PerformanceTimer, RenderTimer, SimTimer},
-    utils::{cursor_to_world, get_canvas_line, MousePos},
+    utils::{cursor_to_world, MousePos},
 };
 
 pub const WIDTH: f32 = 1920.0;
@@ -125,11 +125,9 @@ fn setup(
     let mut sim_pipeline = CASimulator::new(vulkano_context.compute_queue());
     // Ensure bg is white for empty when grey scale...
     if GREY_SCALE {
-        sim_pipeline.draw_matter(
-            &[IVec2::new(CANVAS_SIZE_X as i32, CANVAS_SIZE_Y as i32) / 2],
-            CANVAS_SIZE_X as f32,
-            MatterId::Empty,
-        );
+        let start = Vec2::new(CANVAS_SIZE_X as f32, CANVAS_SIZE_Y as f32) / 2.0;
+        let end = start;
+        sim_pipeline.draw_matter(start, end, CANVAS_SIZE_X as f32, MatterId::Empty);
     }
     // Create simple orthographic camera
     let mut camera = OrthographicCamera::default();
@@ -170,8 +168,13 @@ fn draw_matter(
 ) {
     if let Some(current) = current.0 {
         if mouse_button_input.pressed(MouseButton::Left) {
-            let line = get_canvas_line(prev.0, current);
-            simulator.draw_matter(&line, settings.brush_radius, settings.draw_matter);
+            let end = current.canvas_pos();
+            let start = if let Some(prev) = prev.0 {
+                prev.canvas_pos()
+            } else {
+                end
+            };
+            simulator.draw_matter(start, end, settings.brush_radius, settings.draw_matter);
         }
     }
 }

@@ -165,20 +165,3 @@ impl MousePos {
         self.world + Vec2::new(CANVAS_SIZE_X as f32 / 2.0, CANVAS_SIZE_Y as f32 / 2.0)
     }
 }
-
-/// Gets a line of canvas coordinates between previous and current mouse position
-pub fn get_canvas_line(prev: Option<MousePos>, current: MousePos) -> Vec<IVec2> {
-    let canvas_pos = current.canvas_pos();
-    let prev = if let Some(prev) = prev {
-        prev.canvas_pos()
-    } else {
-        canvas_pos
-    };
-    line_drawing::Bresenham::new(
-        (prev.x.round() as i32, prev.y.round() as i32),
-        (canvas_pos.x.round() as i32, canvas_pos.y.round() as i32),
-    )
-    .into_iter()
-    .map(|pos| IVec2::new(pos.0, pos.1))
-    .collect::<Vec<IVec2>>()
-}

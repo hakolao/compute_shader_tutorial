@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use bevy::{math::IVec2, utils::HashMap};
+use bevy::math::{IVec2, Vec2};
 use bevy_vulkano::{create_device_image, DeviceImageView};
 use vulkano::{
     buffer::{BufferUsage, CpuAccessibleBuffer, DeviceLocalBuffer},
@@ -44,7 +44,6 @@ pub struct CASimulator {
     color_pipeline: Arc<ComputePipeline>,
     draw_matter_pipeline: Arc<ComputePipeline>,
     query_matter_pipeline: Arc<ComputePipeline>,
-    draw_matter_staged: HashMap<IVec2, (MatterWithColor, f32)>,
     matter_in: Arc<DeviceLocalBuffer<[u32]>>,
     matter_out: Arc<DeviceLocalBuffer<[u32]>>,
     query_matter: Arc<CpuAccessibleBuffer<[u32]>>,
@@ -53,7 +52,8 @@ pub struct CASimulator {
     move_step: u32,
     draw_radius: f32,
     draw_matter: MatterWithColor,
-    draw_pos: IVec2,
+    draw_pos_start: Vec2,
+    draw_pos_end: Vec2,
     query_pos: IVec2,
 }
 
@@ -150,7 +150,6 @@ impl CASimulator {
             color_pipeline,
             draw_matter_pipeline,
             query_matter_pipeline,
-            draw_matter_staged: HashMap::default(),
             matter_in,
             matter_out,
             query_matter,
@@ -159,7 +158,8 @@ impl CASimulator {
             move_step: 0,
             draw_radius: 0.0,
             draw_matter: MatterWithColor::from(0),
-            draw_pos: IVec2::new(0, 0),
+            draw_pos_start: Vec2::new(0.0, 0.0),
+            draw_pos_end: Vec2::new(0.0, 0.0),
             query_pos: IVec2::new(0, 0),
         }
     }
@@ -210,28 +210,32 @@ impl CASimulator {
     }
 
     /// Draw matter line with given radius
-    pub fn draw_matter(&mut self, line: &[IVec2], radius: f32, matter: MatterId) {
-        for &pos in line.iter() {
-            if !self.is_inside(pos) {
-                continue;
-            }
-            self.draw_matter_staged
-                .insert(pos, (MatterWithColor::new(matter), radius));
-        }
-    }
+    pub fn draw_matter(&mut self, start: Vec2, end: Vec2, radius: f32, matter: MatterId) {
+        // Update our variables to be used as push constants
+        self.draw_pos_start = start;
+        self.draw_pos_end = end;
+        self.draw_matter = MatterWithColor::new(matter);
+        self.draw_radius = radius;
 
-    fn dispatch_draw_matter(
-        &mut self,
-        builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
-        pipeline: Arc<ComputePipeline>,
-    ) {
-        let draw_matter_staged = self.draw_matter_staged.clone();
-        for (pos, (matter, radius)) in draw_matter_staged.iter() {
-            self.draw_pos = *pos;
-            self.draw_matter = *matter;
-            self.draw_radius = *radius;
-            self.dispatch(builder, pipeline.clone(), false);
-        }
+        // Build command buffer
+        let mut command_buffer_builder = AutoCommandBufferBuilder::primary(
+            self.compute_queue.device().clone(),
+            self.compute_queue.family(),
+            CommandBufferUsage::OneTimeSubmit,
+        )
+        .unwrap();
+
+        // Dispatch
+        self.dispatch(
+            &mut command_buffer_builder,
+            self.draw_matter_pipeline.clone(),
+            false,
+        );
+
+        // Execute & finish (no need to wait)
+        let command_buffer = command_buffer_builder.build().unwrap();
+        let finished = command_buffer.execute(self.compute_queue.clone()).unwrap();
+        let _fut = finished.then_signal_fence_and_flush().unwrap();
     }
 
     /// Step simulation
@@ -242,14 +246,6 @@ impl CASimulator {
             CommandBufferUsage::OneTimeSubmit,
         )
         .unwrap();
-
-        if !self.draw_matter_staged.is_empty() {
-            self.dispatch_draw_matter(
-                &mut command_buffer_builder,
-                self.draw_matter_pipeline.clone(),
-            );
-            self.draw_matter_staged.clear();
-        }
 
         if !is_paused {
             for _ in 0..move_steps {
@@ -303,7 +299,8 @@ impl CASimulator {
         let push_constants = fall_empty_cs::ty::PushConstants {
             sim_step: self.sim_step as u32,
             move_step: self.move_step as u32,
-            draw_pos: self.draw_pos.into(),
+            draw_pos_start: self.draw_pos_start.into(),
+            draw_pos_end: self.draw_pos_end.into(),
             draw_radius: self.draw_radius,
             draw_matter: self.draw_matter.value,
             query_pos: self.query_pos.into(),
@@ -384,9 +381,7 @@ mod tests {
         let pos = IVec2::new(10, 10);
         // Empty matter first
         assert_eq!(simulator.query_matter(pos), Some(MatterId::Empty));
-        simulator.draw_matter(&[pos], 0.5, MatterId::Sand);
-        // Step paused to ensure draw matter goes to grid
-        simulator.step(1, true);
+        simulator.draw_matter(pos.as_vec2(), pos.as_vec2(), 0.5, MatterId::Sand);
         // After drawing, We have Sand
         assert_eq!(simulator.query_matter(pos), Some(MatterId::Sand));
         // Step once

@@ -17,7 +17,8 @@ layout(set = 0, binding = 3) restrict writeonly buffer QueryMatterBuffer { uint 
 layout(push_constant) uniform PushConstants {
     uint sim_step;
     uint move_step;
-    ivec2 draw_pos;
+    vec2 draw_pos_start;
+    vec2 draw_pos_end;
     float draw_radius;
     uint draw_matter;
     ivec2 query_pos;
