@@ -91,16 +91,16 @@ pub fn user_interface(
                     }
                 });
         });
-    let primary = windows.get_primary().unwrap();
-    if primary.cursor_position().is_some() {
-        let world_pos = cursor_to_world(primary, camera.pos, camera.scale);
-        let sim_pos = MousePos::new(world_pos).canvas_pos();
-        egui::containers::show_tooltip_at_pointer(&ctx, egui::Id::new("Hover tooltip"), |ui| {
-            ui.label(format!("World: [{:.2}, {:.2}]", world_pos.x, world_pos.y));
-            ui.label(format!("Sim: [{:.2}, {:.2}]", sim_pos.x, sim_pos.y));
-            if let Some(matter) = simulator.query_matter(sim_pos.as_ivec2()) {
-                ui.label(format!("Matter: {:?}", matter));
-            }
-        });
-    }
+    // let primary = windows.get_primary().unwrap();
+    // if primary.cursor_position().is_some() {
+    //     let world_pos = cursor_to_world(primary, camera.pos, camera.scale);
+    //     let sim_pos = MousePos::new(world_pos).canvas_pos();
+    //     egui::containers::show_tooltip_at_pointer(&ctx, egui::Id::new("Hover tooltip"), |ui| {
+    //         ui.label(format!("World: [{:.2}, {:.2}]", world_pos.x, world_pos.y));
+    //         ui.label(format!("Sim: [{:.2}, {:.2}]", sim_pos.x, sim_pos.y));
+    //         if let Some(matter) = simulator.query_matter(sim_pos.as_ivec2()) {
+    //             ui.label(format!("Matter: {:?}", matter));
+    //         }
+    //     });
+    // }
 }

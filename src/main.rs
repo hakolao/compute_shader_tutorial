@@ -121,7 +121,15 @@ fn setup(
     );
 
     // Use same queue for compute
-    let sim_pipeline = CASimulator::new(vulkano_context.compute_queue());
+    let mut sim_pipeline = CASimulator::new(vulkano_context.compute_queue());
+    // Ensure bg is white for empty when grey scale...
+    if GREY_SCALE {
+        sim_pipeline.draw_matter(
+            &[IVec2::new(CANVAS_SIZE_X as i32, CANVAS_SIZE_Y as i32) / 2],
+            CANVAS_SIZE_X as f32,
+            MatterId::Empty,
+        );
+    }
     // Create simple orthographic camera
     let mut camera = OrthographicCamera::default();
     // Zoom camera to fit vertical pixels

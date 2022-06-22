@@ -16,6 +16,9 @@ layout(set = 0, binding = 2, rgba8) restrict uniform writeonly image2D canvas_im
 layout(push_constant) uniform PushConstants {
     uint sim_step;
     uint move_step;
+    ivec2 draw_pos;
+    float draw_radius;
+    uint draw_matter;
 } push_constants;
 
 #include "dirs.glsl"
@@ -64,6 +67,10 @@ uint matter_to_uint(Matter matter) {
 
 void write_matter(ivec2 pos, Matter matter) {
     matter_out[get_index(pos)] = matter_to_uint(matter);
+}
+
+void write_matter_input(ivec2 pos, Matter matter) {
+    matter_in[get_index(pos)] = matter_to_uint(matter);
 }
 
 void write_image_color(ivec2 pos, vec4 color) {
