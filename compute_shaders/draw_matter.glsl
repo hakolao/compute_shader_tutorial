@@ -2,6 +2,30 @@
 
 #include "includes.glsl"
 
+// https://stackoverflow.com/questions/4200224/random-noise-functions-for-glsl
+float PHI = 1.61803398874989484820459; // Golden ratio
+float rand(in vec2 xy, in float seed){
+    return fract(tan(distance(xy * PHI, xy) * seed) * xy.x);
+}
+
+vec4 vary_color_rgb(vec4 color, ivec2 seed_pos) {
+    // Just use the same seed (means same color for individual xy position)
+    float seed = 0.1;
+    float p = rand(seed_pos, seed);
+    float variation = -0.1 + 0.2 * p;
+    color.rgb += vec3(variation);
+    return color;
+}
+
+uint variate_color(ivec2 pos, uint color) {
+    vec4 color_f32 = matter_color_to_vec4(color);
+    vec4 variated_color_f32 = vary_color_rgb(color_f32, pos);
+    uint rgb = ((uint(variated_color_f32.r * 255.0) & uint(255)) << uint(16)) |
+            ((uint(variated_color_f32.g * 255.0) & uint(255)) << uint(8)) |
+            (uint(variated_color_f32.b * 255.0) & uint(255));
+    return rgb;
+}
+
 void draw_matter(ivec2 pos, ivec2 draw_pos, float radius, Matter matter) {
     int y_start = draw_pos.y - int(radius);
     int y_end = draw_pos.y + int(radius);
@@ -11,7 +35,10 @@ void draw_matter(ivec2 pos, ivec2 draw_pos, float radius, Matter matter) {
         vec2 diff = vec2(pos) - vec2(draw_pos);
         float dist = length(diff);
         if (round(dist) <= radius) {
-            // We write to matter input
+            // We vary color only if not empty
+            if (!is_empty(matter)) {
+                matter.color = variate_color(pos, matter.color);
+            }
             write_matter_input(pos, matter);
         }
     }

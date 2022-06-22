@@ -7,6 +7,7 @@ use vulkano::{
     image::{ImageAccess, ImageViewAbstract},
     pipeline::{
         graphics::{
+            color_blend::ColorBlendState,
             input_assembly::InputAssemblyState,
             vertex_input::BuffersDefinition,
             viewport::{Viewport, ViewportState},
@@ -42,6 +43,7 @@ impl DrawQuadPipeline {
                 .fragment_shader(fs.entry_point("main").unwrap(), ())
                 .viewport_state(ViewportState::viewport_dynamic_scissor_irrelevant())
                 .render_pass(subpass)
+                .color_blend_state(ColorBlendState::default().blend_alpha())
                 .build(gfx_queue.device().clone())
                 .unwrap()
         };

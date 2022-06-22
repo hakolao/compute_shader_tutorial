@@ -12,6 +12,7 @@ Buffers
 layout(set = 0, binding = 0) restrict buffer MatterInBuffer { uint matter_in[]; };
 layout(set = 0, binding = 1) restrict writeonly buffer MatterOutBuffer { uint matter_out[]; };
 layout(set = 0, binding = 2, rgba8) restrict uniform writeonly image2D canvas_img;
+layout(set = 0, binding = 3) restrict writeonly buffer QueryMatterBuffer { uint query_matter[]; };
 
 layout(push_constant) uniform PushConstants {
     uint sim_step;
@@ -19,6 +20,7 @@ layout(push_constant) uniform PushConstants {
     ivec2 draw_pos;
     float draw_radius;
     uint draw_matter;
+    ivec2 query_pos;
 } push_constants;
 
 #include "dirs.glsl"
@@ -63,6 +65,10 @@ Matter read_matter(ivec2 pos) {
 
 uint matter_to_uint(Matter matter) {
     return ((matter.color << uint(8)) | matter.matter);
+}
+
+void write_query_matter(Matter matter) {
+    query_matter[0] = matter_to_uint(matter);
 }
 
 void write_matter(ivec2 pos, Matter matter) {
@@ -110,5 +116,11 @@ bool slides_on_empty(Matter from_diagonal, Matter to_diagonal, Matter from_down)
     return is_gravity(from_diagonal) && !is_empty(from_down) && is_empty(to_diagonal);
 }
 
+vec4 matter_color_to_vec4(uint color) {
+    return  vec4(float((color >> uint(16)) & uint(255)) / 255.0,
+        float((color >> uint(8)) & uint(255)) / 255.0,
+        float(color & uint(255)) / 255.0,
+        1.0);
+}
 
 

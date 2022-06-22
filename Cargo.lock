@@ -764,7 +764,6 @@ dependencies = [
  "bevy_vulkano",
  "bytemuck",
  "line_drawing",
- "rand",
  "strum",
  "strum_macros",
  "vulkano",

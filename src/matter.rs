@@ -1,4 +1,3 @@
-use rand::Rng;
 use strum_macros::EnumIter;
 
 use crate::{
@@ -39,16 +38,6 @@ impl MatterId {
         } else {
             u32_rgba_to_u8_rgba(color)
         }
-    }
-
-    fn color_rgba_f32(&self) -> [f32; 4] {
-        let rgba = self.color_rgba_u8();
-        [
-            rgba[0] as f32 / 255.0,
-            rgba[1] as f32 / 255.0,
-            rgba[2] as f32 / 255.0,
-            rgba[3] as f32 / 255.0,
-        ]
     }
 }
 

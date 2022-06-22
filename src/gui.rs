@@ -11,10 +11,10 @@ use strum::IntoEnumIterator;
 use crate::{
     ca_simulator::CASimulator,
     camera::OrthographicCamera,
+    cursor_to_world,
     matter::MatterId,
     timer::{RenderTimer, SimTimer},
-    utils::{cursor_to_world, MousePos},
-    DynamicSettings, CANVAS_SIZE_X, CANVAS_SIZE_Y,
+    DynamicSettings, MousePos, CANVAS_SIZE_X, CANVAS_SIZE_Y,
 };
 
 /// Give our text a custom size
@@ -31,7 +31,7 @@ pub fn user_interface(
     mut settings: ResMut<DynamicSettings>,
     sim_timer: Res<SimTimer>,
     render_timer: Res<RenderTimer>,
-    simulator: Res<CASimulator>,
+    mut simulator: ResMut<CASimulator>,
 ) {
     let ctx = vulkano_windows
         .get_primary_window_renderer()
@@ -50,11 +50,6 @@ pub fn user_interface(
             sized_text(
                 ui,
                 format!("Grid size: ({},{})", CANVAS_SIZE_X, CANVAS_SIZE_Y),
-                size,
-            );
-            sized_text(
-                ui,
-                format!("Dispatches per step {}", simulator.dispatches_per_step),
                 size,
             );
             sized_text(
@@ -91,16 +86,16 @@ pub fn user_interface(
                     }
                 });
         });
-    // let primary = windows.get_primary().unwrap();
-    // if primary.cursor_position().is_some() {
-    //     let world_pos = cursor_to_world(primary, camera.pos, camera.scale);
-    //     let sim_pos = MousePos::new(world_pos).canvas_pos();
-    //     egui::containers::show_tooltip_at_pointer(&ctx, egui::Id::new("Hover tooltip"), |ui| {
-    //         ui.label(format!("World: [{:.2}, {:.2}]", world_pos.x, world_pos.y));
-    //         ui.label(format!("Sim: [{:.2}, {:.2}]", sim_pos.x, sim_pos.y));
-    //         if let Some(matter) = simulator.query_matter(sim_pos.as_ivec2()) {
-    //             ui.label(format!("Matter: {:?}", matter));
-    //         }
-    //     });
-    // }
+    let primary = windows.get_primary().unwrap();
+    if primary.cursor_position().is_some() {
+        let world_pos = cursor_to_world(primary, camera.pos, camera.scale);
+        let sim_pos = MousePos::new(world_pos).canvas_pos();
+        egui::containers::show_tooltip_at_pointer(&ctx, egui::Id::new("Hover tooltip"), |ui| {
+            ui.label(format!("World: [{:.2}, {:.2}]", world_pos.x, world_pos.y));
+            ui.label(format!("Sim: [{:.2}, {:.2}]", sim_pos.x, sim_pos.y));
+            if let Some(matter) = simulator.query_matter(sim_pos.as_ivec2()) {
+                ui.label(format!("Matter: {:?}", matter));
+            }
+        });
+    }
 }
