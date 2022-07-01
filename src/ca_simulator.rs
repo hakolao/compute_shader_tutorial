@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use bevy::math::{IVec2, Vec2};
-use bevy_vulkano::{create_device_image, DeviceImageView};
+use bevy_vulkano::{create_device_image_with_usage, DeviceImageView};
 use vulkano::{
     buffer::{BufferUsage, CpuAccessibleBuffer},
     command_buffer::{
@@ -11,6 +11,7 @@ use vulkano::{
     descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet},
     device::Queue,
     format::Format,
+    image::ImageUsage,
     pipeline::{ComputePipeline, Pipeline, PipelineBindPoint},
     sync::GpuFuture,
 };
@@ -79,10 +80,16 @@ impl CASimulator {
             )
         };
         // Create color image
-        let image = create_device_image(
+        let image = create_device_image_with_usage(
             compute_queue.clone(),
             [CANVAS_SIZE_X, CANVAS_SIZE_Y],
             Format::R8G8B8A8_UNORM,
+            ImageUsage {
+                sampled: true,
+                storage: true,
+                transfer_destination: true,
+                ..ImageUsage::none()
+            },
         );
         CASimulator {
             compute_queue,
