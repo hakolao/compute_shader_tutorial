@@ -24,7 +24,7 @@ ivec2 get_current_sim_pos() {
 }
 
 int get_index(ivec2 pos) {
-    return pos.y * canvas_size_y + pos.x;
+    return pos.y * canvas_size_x + pos.x;
 }
 
 bool is_inside_sim_canvas(ivec2 pos) {
