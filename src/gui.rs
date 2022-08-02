@@ -4,7 +4,7 @@ use bevy::{
 };
 use bevy_vulkano::{
     egui_winit_vulkano::{egui, egui::Ui},
-    VulkanoWindows,
+    BevyVulkanoWindows,
 };
 
 /// Give our text a custom size
@@ -13,11 +13,9 @@ fn sized_text(ui: &mut Ui, text: impl Into<String>, size: f32) {
 }
 
 /// System to generate user interface with egui
-pub fn user_interface(vulkano_windows: Res<VulkanoWindows>, diagnostics: Res<Diagnostics>) {
-    let ctx = vulkano_windows
-        .get_primary_window_renderer()
-        .unwrap()
-        .gui_context();
+pub fn user_interface(vulkano_windows: NonSend<BevyVulkanoWindows>, diagnostics: Res<Diagnostics>) {
+    let (_, gui) = vulkano_windows.get_primary_window_renderer().unwrap();
+    let ctx = gui.context();
     egui::Area::new("fps")
         .fixed_pos(egui::pos2(10.0, 10.0))
         .show(&ctx, |ui| {

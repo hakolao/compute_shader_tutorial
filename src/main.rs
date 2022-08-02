@@ -8,15 +8,14 @@ mod vertex;
 use std::sync::Arc;
 
 use bevy::{
-    input::{mouse::MouseWheel, system::exit_on_esc_system},
+    input::mouse::MouseWheel,
     prelude::*,
-    window::WindowMode,
+    window::{close_on_esc, WindowMode},
 };
 use bevy_vulkano::{
-    texture_from_file, VulkanoContext, VulkanoWindows, VulkanoWinitConfig, VulkanoWinitPlugin,
-    DEFAULT_IMAGE_FORMAT,
+    texture_from_file_bytes, BevyVulkanoWindows, VulkanoWinitConfig, VulkanoWinitPlugin,
 };
-use vulkano::image::ImageViewAbstract;
+use vulkano::{format::Format, image::ImageViewAbstract};
 
 use crate::{camera::OrthographicCamera, gui::user_interface, render::FillScreenRenderPass};
 
@@ -27,7 +26,7 @@ pub const CAMERA_MOVE_SPEED: f32 = 200.0;
 
 fn main() {
     App::new()
-        .insert_resource(VulkanoWinitConfig::default())
+        .insert_non_send_resource(VulkanoWinitConfig::default())
         .insert_resource(WindowDescriptor {
             width: WIDTH,
             height: HEIGHT,
@@ -40,12 +39,13 @@ fn main() {
         // Add needed plugins
         .add_plugin(bevy::core::CorePlugin)
         .add_plugin(bevy::log::LogPlugin)
+        .add_plugin(bevy::time::TimePlugin)
         .add_plugin(bevy::diagnostic::DiagnosticsPlugin)
         .add_plugin(bevy::diagnostic::FrameTimeDiagnosticsPlugin)
         .add_plugin(bevy::input::InputPlugin)
         .add_plugin(VulkanoWinitPlugin)
         .add_startup_system(setup)
-        .add_system(exit_on_esc_system)
+        .add_system(close_on_esc)
         .add_system(input_actions)
         .add_system(update_camera)
         // Gui
@@ -58,21 +58,17 @@ fn main() {
 struct TreeImage(Arc<dyn ImageViewAbstract + Send + Sync + 'static>);
 
 /// Creates our simulation & render pipelines
-fn setup(
-    mut commands: Commands,
-    vulkano_windows: Res<VulkanoWindows>,
-    vulkano_context: Res<VulkanoContext>,
-) {
-    let primary_window_renderer = vulkano_windows.get_primary_window_renderer().unwrap();
+fn setup(mut commands: Commands, vulkano_windows: NonSend<BevyVulkanoWindows>) {
+    let (primary_window_renderer, _gui) = vulkano_windows.get_primary_window_renderer().unwrap();
     // Create our render pass
     let fill_screen = FillScreenRenderPass::new(
-        vulkano_context.graphics_queue(),
+        primary_window_renderer.graphics_queue(),
         primary_window_renderer.swapchain_format(),
     );
-    let tree_image = texture_from_file(
-        vulkano_context.graphics_queue(),
+    let tree_image = texture_from_file_bytes(
+        primary_window_renderer.graphics_queue(),
         include_bytes!("../assets/tree.png"),
-        DEFAULT_IMAGE_FORMAT,
+        Format::R8G8B8A8_SRGB,
     )
     .unwrap();
     // Create simple orthographic camera
@@ -85,14 +81,14 @@ fn setup(
 
 /// Render the simulation
 fn render(
-    mut vulkano_windows: ResMut<VulkanoWindows>,
+    mut vulkano_windows: NonSendMut<BevyVulkanoWindows>,
     mut fill_screen: ResMut<FillScreenRenderPass>,
     camera: Res<OrthographicCamera>,
     tree_image: Res<TreeImage>,
 ) {
-    let window_renderer = vulkano_windows.get_primary_window_renderer_mut().unwrap();
+    let (window_renderer, gui) = vulkano_windows.get_primary_window_renderer_mut().unwrap();
     // Start frame
-    let before = match window_renderer.start_frame() {
+    let before = match window_renderer.acquire() {
         Err(e) => {
             bevy::log::error!("Failed to start frame: {}", e);
             return;
@@ -103,7 +99,7 @@ fn render(
     let tree_image = tree_image.0.clone();
 
     // Render
-    let final_image = window_renderer.final_image();
+    let final_image = window_renderer.swapchain_image_view();
     let after_images = fill_screen.draw(
         before,
         *camera,
@@ -115,12 +111,10 @@ fn render(
     );
 
     // Draw gui
-    let after_gui = window_renderer
-        .gui()
-        .draw_on_image(after_images, final_image);
+    let after_gui = gui.draw_on_image(after_images, final_image);
 
     // Finish Frame
-    window_renderer.finish_frame(after_gui);
+    window_renderer.present(after_gui, true);
 }
 
 /// Update camera (if window is resized)

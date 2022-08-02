@@ -1,11 +1,11 @@
 use bevy::{
-    math::{const_mat4, Mat4, Vec2},
+    math::{Mat4, Vec2},
     prelude::Transform,
 };
 
 // c1r1: y flipped for vulkan
 #[rustfmt::skip]
-pub const OPENGL_TO_VULKAN_MATRIX: Mat4 = const_mat4!([
+pub const OPENGL_TO_VULKAN_MATRIX: Mat4 = Mat4::from_cols_array(&[
     1.0, 0.0, 0.0, 0.0,
     0.0, -1.0, 0.0, 0.0,
     0.0, 0.0, 0.5, 0.0,
