@@ -1,14 +1,16 @@
 use std::sync::Arc;
 
-use bevy_vulkano::FinalImageView;
 use vulkano::{
-    command_buffer::{AutoCommandBufferBuilder, CommandBufferUsage, SubpassContents},
+    command_buffer::{
+        AutoCommandBufferBuilder, CommandBufferUsage, RenderPassBeginInfo, SubpassContents,
+    },
     device::Queue,
     format::Format,
-    image::{ImageAccess, ImageViewAbstract},
+    image::ImageAccess,
     render_pass::{Framebuffer, FramebufferCreateInfo, RenderPass, Subpass},
     sync::GpuFuture,
 };
+use vulkano_util::renderer::{DeviceImageView, SwapchainImageView};
 
 use crate::{camera::OrthographicCamera, quad_pipeline::DrawQuadPipeline};
 
@@ -52,8 +54,8 @@ impl FillScreenRenderPass {
         &mut self,
         before_future: F,
         camera: OrthographicCamera,
-        image: Arc<dyn ImageViewAbstract>,
-        target: FinalImageView,
+        image: DeviceImageView,
+        target: SwapchainImageView,
         clear_color: [f32; 4],
         flip_x: bool,
         flip_y: bool,
@@ -77,9 +79,13 @@ impl FillScreenRenderPass {
         )
         .unwrap();
         command_buffer_builder
-            .begin_render_pass(framebuffer, SubpassContents::SecondaryCommandBuffers, [
-                clear_color.into(),
-            ])
+            .begin_render_pass(
+                RenderPassBeginInfo {
+                    clear_values: vec![Some(clear_color.into())],
+                    ..RenderPassBeginInfo::framebuffer(framebuffer)
+                },
+                SubpassContents::SecondaryCommandBuffers,
+            )
             .unwrap();
         // Create secondary command buffer from quad pipeline (subpass) and execute it inside our render pass.
         // Then build the primary command buffer and execute it.

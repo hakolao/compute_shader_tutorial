@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use bevy::math::{IVec2, Vec2};
-use bevy_vulkano::{create_device_image_with_usage, DeviceImageView};
 use vulkano::{
     buffer::{BufferUsage, CpuAccessibleBuffer},
     command_buffer::{
@@ -11,13 +10,14 @@ use vulkano::{
     descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet},
     device::Queue,
     format::Format,
-    image::ImageUsage,
+    image::{ImageUsage, StorageImage},
     pipeline::{ComputePipeline, Pipeline, PipelineBindPoint},
     sync::GpuFuture,
 };
+use vulkano_util::renderer::DeviceImageView;
 
 use crate::{
-    utils::{create_compute_pipeline, image_desc_set, storage_buffer_desc},
+    utils::{create_compute_pipeline, storage_buffer_desc, storage_image_desc},
     CANVAS_SIZE_X, CANVAS_SIZE_Y, LOCAL_SIZE_X, LOCAL_SIZE_Y, NUM_WORK_GROUPS_X, NUM_WORK_GROUPS_Y,
 };
 
@@ -70,7 +70,8 @@ impl CASimulator {
             let descriptor_layout = [
                 (0, storage_buffer_desc()),
                 (1, storage_buffer_desc()),
-                (2, image_desc_set()),
+                (2, storage_image_desc()),
+                (3, storage_buffer_desc()),
             ];
             create_compute_pipeline(
                 compute_queue.clone(),
@@ -80,17 +81,18 @@ impl CASimulator {
             )
         };
         // Create color image
-        let image = create_device_image_with_usage(
+        let image = StorageImage::general_purpose_image_view(
             compute_queue.clone(),
             [CANVAS_SIZE_X, CANVAS_SIZE_Y],
             Format::R8G8B8A8_UNORM,
             ImageUsage {
                 sampled: true,
+                transfer_dst: true,
                 storage: true,
-                transfer_destination: true,
                 ..ImageUsage::none()
             },
-        );
+        )
+        .unwrap();
         CASimulator {
             compute_queue,
             color_pipeline,
