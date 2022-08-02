@@ -24,24 +24,16 @@ use crate::{CANVAS_SIZE_X, CANVAS_SIZE_Y};
 /// Descriptor set layout binding information for storage buffer
 pub fn storage_buffer_desc() -> DescriptorSetLayoutBinding {
     DescriptorSetLayoutBinding {
-        descriptor_type: DescriptorType::StorageBuffer,
-        descriptor_count: 1,
-        variable_descriptor_count: false,
-        stages: ShaderStages::all(),
-        immutable_samplers: Vec::new(),
-        _ne: Default::default(),
+        stages: ShaderStages::compute(),
+        ..DescriptorSetLayoutBinding::descriptor_type(DescriptorType::StorageBuffer)
     }
 }
 
 /// Descriptor set layout binding information for image buffer
-pub fn image_desc_set() -> DescriptorSetLayoutBinding {
+pub fn storage_image_desc() -> DescriptorSetLayoutBinding {
     DescriptorSetLayoutBinding {
-        descriptor_type: DescriptorType::StorageImage,
-        descriptor_count: 1,
-        variable_descriptor_count: false,
-        stages: ShaderStages::all(),
-        immutable_samplers: Vec::new(),
-        _ne: Default::default(),
+        stages: ShaderStages::compute(),
+        ..DescriptorSetLayoutBinding::descriptor_type(DescriptorType::StorageImage)
     }
 }
 
