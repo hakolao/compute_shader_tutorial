@@ -9,14 +9,13 @@ mod utils;
 mod vertex;
 
 use bevy::{
-    core::FixedTimestep,
-    input::{mouse::MouseWheel, system::exit_on_esc_system},
+    input::mouse::MouseWheel,
     prelude::*,
-    window::WindowMode,
+    time::FixedTimestep,
+    window::{close_on_esc, WindowMode},
 };
 use bevy_vulkano::{
-    egui_winit_vulkano::egui::Visuals, VulkanoContext, VulkanoWindows, VulkanoWinitConfig,
-    VulkanoWinitPlugin,
+    egui_winit_vulkano::egui::Visuals, BevyVulkanoWindows, VulkanoWinitConfig, VulkanoWinitPlugin,
 };
 
 use crate::{
@@ -70,7 +69,7 @@ pub struct CurrentMousePos(pub Option<MousePos>);
 
 fn main() {
     App::new()
-        .insert_resource(VulkanoWinitConfig::default())
+        .insert_non_send_resource(VulkanoWinitConfig::default())
         .insert_resource(WindowDescriptor {
             width: WIDTH,
             height: HEIGHT,
@@ -83,12 +82,14 @@ fn main() {
         // Add needed plugins
         .add_plugin(bevy::core::CorePlugin)
         .add_plugin(bevy::log::LogPlugin)
+        .add_plugin(bevy::time::TimePlugin)
+        .add_plugin(bevy::diagnostic::LogDiagnosticsPlugin::default())
         .add_plugin(bevy::diagnostic::DiagnosticsPlugin)
         .add_plugin(bevy::diagnostic::FrameTimeDiagnosticsPlugin)
         .add_plugin(bevy::input::InputPlugin)
         .add_plugin(VulkanoWinitPlugin)
         .add_startup_system(setup)
-        .add_system(exit_on_esc_system)
+        .add_system(close_on_esc)
         .add_system(input_actions)
         .add_system(update_camera)
         .add_system(update_mouse)
@@ -108,20 +109,16 @@ fn main() {
 }
 
 /// Creates our simulation & render pipelines
-fn setup(
-    mut commands: Commands,
-    vulkano_windows: Res<VulkanoWindows>,
-    vulkano_context: Res<VulkanoContext>,
-) {
-    let primary_window_renderer = vulkano_windows.get_primary_window_renderer().unwrap();
+fn setup(mut commands: Commands, vulkano_windows: NonSend<BevyVulkanoWindows>) {
+    let (primary_window_renderer, gui) = vulkano_windows.get_primary_window_renderer().unwrap();
     // Create our render pass
     let fill_screen = FillScreenRenderPass::new(
-        vulkano_context.graphics_queue(),
+        primary_window_renderer.graphics_queue(),
         primary_window_renderer.swapchain_format(),
     );
 
     // Use same queue for compute
-    let sim_pipeline = CASimulator::new(vulkano_context.compute_queue());
+    let sim_pipeline = CASimulator::new(primary_window_renderer.compute_queue());
     // Create simple orthographic camera
     let mut camera = OrthographicCamera::default();
     // Zoom camera to fit vertical pixels
@@ -140,10 +137,7 @@ fn setup(
     commands.insert_resource(RenderTimer(render_timer));
 
     // Set light mode
-    let ctx = vulkano_windows
-        .get_primary_window_renderer()
-        .unwrap()
-        .gui_context();
+    let ctx = gui.context();
     if GREY_SCALE {
         ctx.set_visuals(Visuals::light());
     } else {
@@ -180,7 +174,7 @@ fn simulate(
 
 /// Render the simulation
 fn render(
-    mut vulkano_windows: ResMut<VulkanoWindows>,
+    mut vulkano_windows: NonSendMut<BevyVulkanoWindows>,
     mut fill_screen: ResMut<FillScreenRenderPass>,
     sim_pipeline: Res<CASimulator>,
     camera: Res<OrthographicCamera>,
@@ -188,9 +182,9 @@ fn render(
 ) {
     render_timer.0.start();
 
-    let window_renderer = vulkano_windows.get_primary_window_renderer_mut().unwrap();
+    let (window_renderer, gui) = vulkano_windows.get_primary_window_renderer_mut().unwrap();
     // Start frame
-    let before = match window_renderer.start_frame() {
+    let before = match window_renderer.acquire() {
         Err(e) => {
             bevy::log::error!("Failed to start frame: {}", e);
             return;
@@ -201,7 +195,7 @@ fn render(
     let canvas_image = sim_pipeline.color_image();
 
     // Render
-    let final_image = window_renderer.final_image();
+    let final_image = window_renderer.swapchain_image_view();
     let after_images = fill_screen.draw(
         before,
         *camera,
@@ -213,12 +207,10 @@ fn render(
     );
 
     // Draw gui
-    let after_gui = window_renderer
-        .gui()
-        .draw_on_image(after_images, final_image);
+    let after_gui = gui.draw_on_image(after_images, final_image);
 
     // Finish Frame
-    window_renderer.finish_frame(after_gui);
+    window_renderer.present(after_gui, true);
 
     render_timer.0.time_it();
 }

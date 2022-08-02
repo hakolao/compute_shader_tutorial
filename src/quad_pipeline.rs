@@ -2,11 +2,15 @@ use std::sync::Arc;
 
 use vulkano::{
     buffer::TypedBufferAccess,
-    command_buffer::{AutoCommandBufferBuilder, CommandBufferUsage, SecondaryAutoCommandBuffer},
+    command_buffer::{
+        AutoCommandBufferBuilder, CommandBufferInheritanceInfo, CommandBufferUsage,
+        SecondaryAutoCommandBuffer,
+    },
     device::Queue,
     image::{ImageAccess, ImageViewAbstract},
     pipeline::{
         graphics::{
+            color_blend::ColorBlendState,
             input_assembly::InputAssemblyState,
             vertex_input::BuffersDefinition,
             viewport::{Viewport, ViewportState},
@@ -26,6 +30,7 @@ use crate::{
 pub struct DrawQuadPipeline {
     gfx_queue: Arc<Queue>,
     pipeline: Arc<GraphicsPipeline>,
+    subpass: Subpass,
     quad: Mesh,
 }
 
@@ -41,13 +46,15 @@ impl DrawQuadPipeline {
                 .input_assembly_state(InputAssemblyState::new())
                 .fragment_shader(fs.entry_point("main").unwrap(), ())
                 .viewport_state(ViewportState::viewport_dynamic_scissor_irrelevant())
-                .render_pass(subpass)
+                .render_pass(subpass.clone())
+                .color_blend_state(ColorBlendState::default().blend_alpha())
                 .build(gfx_queue.device().clone())
                 .unwrap()
         };
         DrawQuadPipeline {
             gfx_queue,
             pipeline,
+            subpass,
             quad,
         }
     }
@@ -61,13 +68,18 @@ impl DrawQuadPipeline {
         flip_x: bool,
         flip_y: bool,
     ) -> SecondaryAutoCommandBuffer {
-        let mut builder = AutoCommandBufferBuilder::secondary_graphics(
+        // Command buffer for our single subpass
+        let mut builder = AutoCommandBufferBuilder::secondary(
             self.gfx_queue.device().clone(),
             self.gfx_queue.family(),
             CommandBufferUsage::MultipleSubmit,
-            self.pipeline.subpass().clone(),
+            CommandBufferInheritanceInfo {
+                render_pass: Some(self.subpass.clone().into()),
+                ..Default::default()
+            },
         )
         .unwrap();
+
         let dims = image.image().dimensions();
         let push_constants = vs::ty::PushConstants {
             world_to_screen: camera.world_to_screen().to_cols_array_2d(),
